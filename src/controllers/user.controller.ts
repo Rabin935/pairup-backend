@@ -1,66 +1,75 @@
 import { Request, Response } from "express";
+import { z } from "zod";
+import { RegisterDto, LoginDto } from "../dtos/user.dto";
 import { UserService } from "../services/user.service";
-import { UpdateUserDto } from "../dtos/user.dto";
-// import { UpdateUserDto } from "../dtos/user.dto";
-// import { UserService } from "../services/user.service";
+import { IUser } from "../models/user.model";
+
+const userService = new UserService();
 
 export class UserController {
-	private userService: UserService;
 
-	constructor(userService: UserService = new UserService()) {
-		this.userService = userService;
-	}
+    async registerUser(req: Request, res: Response) {
+        try {
+            // validate input (DTO responsibility)
+            const parsedUser = RegisterDto.safeParse(req.body);
 
-	getAllUsers = async (_req: Request, res: Response): Promise<void> => {
-		try {
-			const users = await this.userService.getAllUsers();
-			res.json(users);
-		} catch (error) {
-			res.status(500).json({ message: (error as Error).message });
-		}
-	};
+            if (!parsedUser.success) {
+                return res.status(400).json({
+                    errors: parsedUser.error
+                });
+            }
 
-	getUser = async (req: Request, res: Response): Promise<void> => {
-		try {
-			const { uid } = req.params;
-			const user = await this.userService.getUser(uid);
-			if (!user) {
-				res.status(404).json({ message: "User not found" });
-				return;
-			}
-			res.json(user);
-		} catch (error) {
-			res.status(500).json({ message: (error as Error).message });
-		}
-	};
+            // call service
+            const newUser: IUser = await userService.createUser(parsedUser.data);
 
-	updateUser = async (req: Request, res: Response): Promise<void> => {
-		try {
-			const { uid } = req.params;
-			const payload: UpdateUserDto = { ...req.body, uid };
-			const updated = await this.userService.updateUser(payload);
-			if (!updated) {
-				res.status(404).json({ message: "User not found" });
-				return;
-			}
-			res.json(updated);
-		} catch (error) {
-			res.status(400).json({ message: (error as Error).message });
-		}
-	};
+            return res.status(201).json({
+                success: true,
+                data: newUser,
+                message: "User registered successfully"
+            });
 
-	deleteUser = async (req: Request, res: Response): Promise<void> => {
-		try {
-			const { uid } = req.params;
-			const deleted = await this.userService.deleteUser(uid);
-			res.status(200).json({message:"User deleted successfully"})
-			if (!deleted) {
-				res.status(404).json({ message: "User not found" });
-				return;
-			}
-			res.status(204).send();
-		} catch (error) {
-			res.status(500).json({ message: (error as Error).message });
-		}
-	};
+        } catch (error: Error | any) {
+            return res
+                .status(error.statusCode || 500)
+                .json({ message: error.message || "Internal Server Error" });
+        }
+    }
+
+    async loginUser(req: Request, res: Response) {
+        try {
+            // validate input
+            const parsedLogin = LoginDto.safeParse(req.body);
+
+            if (!parsedLogin.success) {
+                return res.status(400).json({
+                    errors: parsedLogin.error
+                });
+            }
+
+            const { token, user } = await userService.loginUser(parsedLogin.data);
+
+            return res.status(200).json({
+                success: true,
+                data: user,
+                token,
+                message: "Login successful"
+            });
+
+        } catch (error: Error | any) {
+            return res
+                .status(error.statusCode || 500)
+                .json({ message: error.message || "Internal Server Error" });
+        }
+    }
+
+    async getAllUsers(_req: Request, res: Response) {
+        try {
+            const users = await userService.getAllUsers();
+            return res.status(200).json(users);
+        } catch (error: Error | any) {
+            return res.status(500).json({
+                message: error.message || "Internal Server Error"
+            });
+        }
+    }
 }

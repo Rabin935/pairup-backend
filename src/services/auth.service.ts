@@ -18,11 +18,11 @@ export class AuthService {
       throw new HttpError(409, "Email already exists");
     }
 
-    // Check if username already exists
-    const usernameExists = await userRepository.getUserByUsername(data.username);
-    if (usernameExists) {
-      throw new HttpError(701, "Username already exists");
-    }
+    // // Check if username already exists
+    // const usernameExists = await userRepository.getUserByUsername(data.username);
+    // if (usernameExists) {
+    //   throw new HttpError(701, "Username already exists");
+    // }
 
     // Hash the password before saving
     const hashedPassword = await bcrypt.hash(data.password, 10);
