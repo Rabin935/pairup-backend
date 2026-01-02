@@ -1,38 +1,36 @@
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 
-// Define User schema using Zod
+/* -------------------- ZOD SCHEMA -------------------- */
 export const UserSchema = z.object({
-  uid: z.string().min(1, { error: "UID is required" }),
-  fullName: z.string().min(1, { error: "Full name is required" }),
-  email: z
-    .string()
-    .email({ message: "Invalid email format" })
-    .min(1, { error: "Email is required" }),
-  authProvider: z.string().min(1, { error: "Auth provider is required" }),
+  uid: z.string().min(1, "UID is required"),
+  fullName: z.string().min(1, "Full name is required"),
+  email: z.string().email("Invalid email format"),
+  authProvider: z.string().min(1, "Auth provider is required"),
   role: z.enum(["admin", "user"]).default("user"),
-  password: z.string().min(6, { error: "Password must be at least 6 char long" }),
-  createdAt: z.date().default(() => new Date()),
-  updatedAt: z.date().default(() => new Date()),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  createdAt: z.coerce.date().default(() => new Date()),
+  updatedAt: z.coerce.date().default(() => new Date()),
 });
 
 export type UserType = z.infer<typeof UserSchema>;
 
-// In-memory "database"
+/* -------------------- IN-MEMORY DB -------------------- */
 const users: UserType[] = [];
 
+/* -------------------- USER SERVICE -------------------- */
 export class UserService {
   /**
-   * Register a new user
+   * Create/Register User
    */
-  static async createUser(data: unknown): Promise<UserType> {
+  static async createUser(data: unknown): Promise<Omit<UserType, "password">> {
     // Validate input
     const parsed = UserSchema.parse(data);
 
-    // Check if email already exists
-    const existingUser = users.find((u) => u.email === parsed.email);
-    if (existingUser) {
-      throw new Error("User with this email already exists");
+    // Check if email exists
+    const exists = users.find((u) => u.email === parsed.email);
+    if (exists) {
+      throw new Error("User already exists with this email");
     }
 
     // Hash password
@@ -46,29 +44,36 @@ export class UserService {
     };
 
     users.push(newUser);
-    return newUser;
+
+    // Remove password before returning
+    const { password, ...safeUser } = newUser;
+    return safeUser;
   }
 
   /**
-   * Login user
+   * Login User
    */
-  static async loginUser(email: string, password: string): Promise<UserType> {
+  static async loginUser(
+    email: string,
+    password: string
+  ): Promise<Omit<UserType, "password">> {
     const user = users.find((u) => u.email === email);
 
     if (!user) {
-      throw new Error("Invalid credentials");
+      throw new Error("Invalid email or password");
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      throw new Error("Invalid credentials");
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      throw new Error("Invalid email or password");
     }
 
-    return user;
+    const { password: _, ...safeUser } = user;
+    return safeUser;
   }
 
   /**
-   * Get all users (admin use)
+   * Get all users (Admin)
    */
   static getAllUsers(): Omit<UserType, "password">[] {
     return users.map(({ password, ...rest }) => rest);
@@ -77,20 +82,28 @@ export class UserService {
   /**
    * Get user by email
    */
-  static getUserByEmail(email: string): UserType | undefined {
-    return users.find((u) => u.email === email);
+  static getUserByEmail(
+    email: string
+  ): Omit<UserType, "password"> | undefined {
+    const user = users.find((u) => u.email === email);
+    if (!user) return undefined;
+
+    const { password, ...safeUser } = user;
+    return safeUser;
   }
 
   /**
    * Update user
    */
-  static async updateUser(email: string, data: Partial<UserType>): Promise<UserType> {
-    const userIndex = users.findIndex((u) => u.email === email);
-    if (userIndex === -1) throw new Error("User not found");
+  static async updateUser(
+    email: string,
+    data: Partial<UserType>
+  ): Promise<Omit<UserType, "password">> {
+    const index = users.findIndex((u) => u.email === email);
+    if (index === -1) throw new Error("User not found");
 
-    const existingUser = users[userIndex];
+    const existingUser = users[index];
 
-    // If password is being updated, hash it
     let updatedPassword = existingUser.password;
     if (data.password) {
       updatedPassword = await bcrypt.hash(data.password, 10);
@@ -106,8 +119,10 @@ export class UserService {
     // Validate updated user
     UserSchema.parse(updatedUser);
 
-    users[userIndex] = updatedUser;
-    return updatedUser;
+    users[index] = updatedUser;
+
+    const { password, ...safeUser } = updatedUser;
+    return safeUser;
   }
 
   /**
@@ -122,7 +137,7 @@ export class UserService {
   }
 
   /**
-   * Check if email exists
+   * Check email existence
    */
   static doesEmailExist(email: string): boolean {
     return users.some((u) => u.email === email);
