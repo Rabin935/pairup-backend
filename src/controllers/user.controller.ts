@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import { UpdateUserDto } from "../dtos/user.dto";
-import { UserService } from "../services/user.service";
+// import { UpdateUserDto } from "../dtos/user.dto";
+// import { UserService } from "../services/user.service";
 
 export class UserController {
 	private userService: UserService;
