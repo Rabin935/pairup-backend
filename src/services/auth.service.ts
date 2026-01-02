@@ -1,75 +1,64 @@
-import bcryptjs from "bcryptjs";
+import { CreateUserDto, LoginUserDto } from "../dtos/user.dto";
+import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { HttpError } from "../error/http-error";
 import { JWT_SECRET } from "../config";
-import { RegisterDto, LoginDto } from "../dtos/auth.dto";
-import { HttpError } from "../errors/http-error";
-import { IUserRepository, UserRepository } from "../respositories/user.repository";
-import { UserType } from "../types/user.type";
+import { UserRepository } from "../repositories/auth.repository";
 
-export type SafeUser = Omit<UserType, "password">;
+const userRepository = new UserRepository();
 
 export class AuthService {
-    private userRepository: IUserRepository;
-
-    constructor(userRepository: IUserRepository = new UserRepository()) {
-        this.userRepository = userRepository;
+  /**
+   * Register a new user
+   */
+  async registerUser(data: CreateUserDto) {
+    // Check if email already exists
+    const emailExists = await userRepository.getUserByEmail(data.email);
+    if (emailExists) {
+      throw new HttpError(409, "Email already exists");
     }
 
-    async register(payload: RegisterDto): Promise<{ token: string; user: SafeUser }> {
-        const data = RegisterDto.parse(payload);
-        const normalizedEmail = data.email.toLowerCase();
-        const existingByUid = await this.userRepository.getUser(data.uid);
-        const existingByEmail = await this.userRepository.getUserByEmail(normalizedEmail);
-        if (existingByUid || existingByEmail) {
-            throw new HttpError(409, "User already exists");
-        }
-
-        const hashedPassword = await bcryptjs.hash(data.password, 10);
-        const userToCreate: UserType = {
-            uid: data.uid,
-            fullName: data.fullName,
-            email: normalizedEmail,
-            allergenicIngredients: data.allergenicIngredients,
-            authProvider: data.authProvider,
-            role: data.role ?? "user",
-            password: hashedPassword,
-            createdAt: data.createdAt ?? new Date(),
-            updatedAt: data.updatedAt ?? new Date(),
-        };
-
-        const created = await this.userRepository.createUser(userToCreate);
-        const token = this.generateToken(created);
-        return { token, user: this.sanitizeUser(created) };
+    // Check if username already exists
+    const usernameExists = await userRepository.getUserByUsername(data.username);
+    if (usernameExists) {
+      throw new HttpError(701, "Username already exists");
     }
 
-    async login(payload: LoginDto): Promise<{ token: string; user: SafeUser }> {
-        const data = LoginDto.parse(payload);
-        const normalizedEmail = data.email.toLowerCase();
-        const user = await this.userRepository.getUserByEmail(normalizedEmail);
-        if (!user) {
-            throw new HttpError(404, "No user found");
-        }
+    // Hash the password before saving
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+    data.password = hashedPassword;
 
-        const validPassword = await bcryptjs.compare(data.password, user.password);
-        if (!validPassword) {
-            throw new HttpError(401, "Invalid password");
-        }
+    // Create user in repository
+    const newUser = await userRepository.createUser(data);
+    return newUser;
+  }
 
-        const token = this.generateToken(user);
-        return { token, user: this.sanitizeUser(user) };
+  /**
+   * Login user
+   */
+  async loginUser(data: LoginUserDto) {
+    // Find user by email
+    const user = await userRepository.getUserByEmail(data.email);
+    if (!user) {
+      throw new HttpError(404, "User not found");
     }
 
-    private generateToken(user: UserType): string {
-        const payload = {
-            id: user.uid,
-            email: user.email,
-            fullName: user.fullName,
-        };
-        return jwt.sign(payload, JWT_SECRET, { expiresIn: "30d" });
+    // Validate password
+    const validPassword = await bcrypt.compare(data.password, user.password);
+    if (!validPassword) {
+      throw new HttpError(401, "Invalid credentials");
     }
 
-    private sanitizeUser(user: UserType): SafeUser {
-        const { password, ...safeUser } = user;
-        return safeUser;
-    }
+    // Generate JWT token
+    const payload = {
+      id: user._id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+    };
+
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "30d" });
+
+    return { token, user };
+  }
 }

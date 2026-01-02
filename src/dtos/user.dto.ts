@@ -1,17 +1,29 @@
-import { z } from "zod";
-import { UserScheme } from "../types/user.type";
+import z from "zod";
+import { UserSchema } from "../types/user.type";
 
-export const UpdateUserDto = UserScheme.pick({
-    uid: true,
-    fullName: true,
-    email: true,
-    allergenicIngredients: true,
-    authProvider: true,
-}).extend({
-    fullName: UserScheme.shape.fullName.optional(),
-    email: UserScheme.shape.email.optional(),
-    allergenicIngredients: UserScheme.shape.allergenicIngredients.optional(),
-    authProvider: UserScheme.shape.authProvider.optional(),
-    updatedAt: UserScheme.shape.updatedAt.optional(),
-});
-export type UpdateUserDto = z.infer<typeof UpdateUserDto>;
+export const CreateUserDto = UserSchema.pick( // re use userSchema
+    {
+        firstName: true, // true - include from userSchema
+        lastName: true,
+        email: true,
+        username: true,
+        password: true
+    }
+).extend( // add new attriute to schema
+    {
+        confirmPassword: z.string().min(6)
+    }
+).refine( // extra validation from existing attributess
+    (data: { password: any; confirmPassword: any; }) => data.password === data.confirmPassword,
+    {
+        message: "Password and Confirm Password must match",
+        path: ["confirmPassword"] // throws error on confirmPassword field
+    }
+)
+export type CreateUserDto = z.infer<typeof CreateUserDto>;
+
+export const LoginUserDto = z.object({
+    email: z.email(),
+    password: z.string().min(6)
+})
+export type LoginUserDto = z.infer<typeof LoginUserDto>;

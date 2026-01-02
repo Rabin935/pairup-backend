@@ -1,32 +1,10 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-import { connectToDb } from "./database/connect-db";
-import userRoutes from "./routes/user.route";
-import authRoutes from "./routes/auth.route";
+import { Router } from "express";
+import { AuthController } from "../controllers/auth.controller";
 
-dotenv.config();
+const router: Router = Router();
+const authController = new AuthController();
 
-const app = express();
-const PORT = process.env.PORT || 5000;
+router.post('/register', authController.registerUser);
+router.post('/login', authController.loginUser);
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-
-// Test route
-app.get("/", (_req, res) => {
-  res.send("Yumm API");
-});
-
-app.use("/api", userRoutes);
-app.use("/api", authRoutes);
-
-// MongoDB connection
-connectToDb().then(() => {
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-  });
-}).catch((err) => {
-  console.error("Failed to start server", err);
-});
+export default router;

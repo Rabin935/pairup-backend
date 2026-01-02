@@ -1,5 +1,4 @@
 import express , { Application, Request, Response } from 'express';
-import  bookRoutes  from './routes/book.route';
 import { connectDB } from './database/mongodb';
 import bodyParser from 'body-parser';
 import { PORT } from './config';
@@ -25,7 +24,7 @@ app.get('/', (req: Request, res: Response) => {
 
 
 
-app.use('/api/books', bookRoutes); 
+ 
 app.use('/api/auth', authRoutes);
 
 

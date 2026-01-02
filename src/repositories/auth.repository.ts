@@ -6,10 +6,10 @@ import { IUser, UserModel } from "../models/user.model";
 export interface IUserRepository {
   createUser(data: Partial<IUser>): Promise<IUser>;
   getUserByEmail(email: string): Promise<IUser | null>;
-  getUserByUsername(fullName: string): Promise<IUser | null>;
-  getUserById(uid: string): Promise<IUser | null>;
+  getUserByUsername(fullname: string): Promise<IUser | null>;
+  getUserById(userId: string): Promise<IUser | null>;
   getAllUsers(): Promise<IUser[]>;
-  deleteUser(uid: string): Promise<boolean>;
+  deleteUser(userId: string): Promise<boolean>;
 }
 
 /**
@@ -29,21 +29,24 @@ export class UserRepository implements IUserRepository {
    * Find user by email
    */
   async getUserByEmail(email: string): Promise<IUser | null> {
-    return UserModel.findOne({ email });
+    const user = await UserModel.findOne({ email });
+    return user;
   }
 
   /**
-   * Find user by fullName (as username)
+   * Find user by username
    */
-  async getUserByUsername(fullName: string): Promise<IUser | null> {
-    return UserModel.findOne({ fullName });
+  async getUserByUsername(username: string): Promise<IUser | null> {
+    const user = await UserModel.findOne({ username });
+    return user;
   }
 
   /**
-   * Find user by uid
+   * Find user by userId
    */
-  async getUserById(uid: string): Promise<IUser | null> {
-    return UserModel.findOne({ uid });
+  async getUserById(userId: string): Promise<IUser | null> {
+    const user = await UserModel.findOne({ userId });
+    return user;
   }
 
   /**
@@ -54,10 +57,10 @@ export class UserRepository implements IUserRepository {
   }
 
   /**
-   * Delete user by uid
+   * Delete user by userId
    */
-  async deleteUser(uid: string): Promise<boolean> {
-    const result = await UserModel.deleteOne({ uid });
+  async deleteUser(userId: string): Promise<boolean> {
+    const result = await UserModel.deleteOne({ userId });
     return result.deletedCount === 1;
   }
 }
