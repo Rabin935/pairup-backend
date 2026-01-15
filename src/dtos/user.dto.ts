@@ -6,7 +6,7 @@ import { UserSchema } from "../types/user.type";
  * Re-uses UserSchema and adds confirmPassword
  */
 export const CreateUserDto = UserSchema.pick({
-  uid: true,
+  // uid: true,
   fullName: true,
   email: true,
   authProvider: true,

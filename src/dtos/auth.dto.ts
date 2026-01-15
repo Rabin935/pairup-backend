@@ -7,13 +7,14 @@ import { UserSchema } from "../types/user.type";
  * ============================
  */
 export const RegisterDto = UserSchema.pick({
-  uid: true,
+  // uid: true,
   fullName: true,
+  // username: true,
   email: true,
   authProvider: true,
   role: true,
   password: true,
-}).extend({
+} as const).extend({
   confirmPassword: z.string().min(6, {
     message: "Confirm password must be at least 6 characters",
   }),

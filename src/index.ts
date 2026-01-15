@@ -5,9 +5,6 @@ import { PORT } from './config';
 
 import authRoutes from './routes/auth.routes';
 
-
-
-
 // dotenv.config();
 
 const app: Application = express();
@@ -20,15 +17,8 @@ app.get('/', (req: Request, res: Response) => {
     res.send('Hello, World!');
 });
 
-
-
-
-
  
 app.use('/api/auth', authRoutes);
-
-
-
 
 async function startServer() {
     await connectDB();
