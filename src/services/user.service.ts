@@ -4,7 +4,8 @@ import bcrypt from "bcryptjs";
 /* -------------------- ZOD SCHEMA -------------------- */
 export const UserSchema = z.object({
   uid: z.string().min(1, "UID is required"),
-  fullName: z.string().min(1, "Full name is required"),
+  fisrtname: z.string().min(1, "Name is required"),
+  lastname: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email format"),
   number: z.string().min(1, "Phone number is required"),
   authProvider: z.string().min(1, "Auth provider is required"),
