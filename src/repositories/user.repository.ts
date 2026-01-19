@@ -6,7 +6,7 @@ import { IUser, UserModel } from "../models/user.model";
 export interface IUserRepository {
   createUser(data: Partial<IUser>): Promise<IUser>;
   getUserByEmail(email: string): Promise<IUser | null>;
-  getUserByUsername(fullName: string): Promise<IUser | null>;
+  // getUserByUsername(fullName: string): Promise<IUser | null>;
   getUserById(uid: string): Promise<IUser | null>;
   getAllUsers(): Promise<IUser[]>;
   deleteUser(uid: string): Promise<boolean>;
@@ -35,9 +35,9 @@ export class UserRepository implements IUserRepository {
   /**
    * Find user by fullName (as username)
    */
-  async getUserByUsername(fullName: string): Promise<IUser | null> {
-    return UserModel.findOne({ fullName });
-  }
+  // async getUserByUsername(fullName: string): Promise<IUser | null> {
+  //   return UserModel.findOne({ fullName });
+  // }
 
   /**
    * Find user by uid

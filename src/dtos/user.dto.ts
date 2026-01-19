@@ -7,7 +7,8 @@ import { UserSchema } from "../types/user.type";
  */
 export const CreateUserDto = UserSchema.pick({
   // uid: true,
-  fullName: true,
+  firstname: true,
+  lastname: true,
   email: true,
   number: true,
   authProvider: true,

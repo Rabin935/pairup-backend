@@ -28,7 +28,7 @@ app.get("/", (_req: Request, res: Response) => {
 
 // routes
 app.use("/api/auth", authRoutes);
-app.use("/api", userRoutes); // 👈 IMPORTANT
+app.use("/api/auth", userRoutes); // 👈 IMPORTANT
 
 async function startServer() {
   await connectDB();
