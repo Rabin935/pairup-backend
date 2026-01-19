@@ -9,6 +9,7 @@ export const CreateUserDto = UserSchema.pick({
   // uid: true,
   fullName: true,
   email: true,
+  number: true,
   authProvider: true,
   password: true,
 }).extend({

@@ -1,10 +1,11 @@
-import { z } from "zod";
+import { number, z } from "zod";
 
 // Import your schema
 export const UserSchema = z.object({
   uid: z.string().min(1, { error: "UID is required" }),
   fullName: z.string().min(1, { error: "Full name is required" }),
   email: z.email({ message: "Invalid email format" }).min(1, { error: "Email is required" }),
+  number: z.string().min(1, { error: "Phone number is required" }),
   authProvider: z.string().min(1, { error: "Auth provider is required" }),
   role: z.enum(["admin", "user"]).default("user"),
   password: z.string().min(6, { error: "Password must be at least 6 char long" }),

@@ -73,7 +73,7 @@ export class UserController {
      */
     async getAllUsers(_req: Request, res: Response) {
         try {
-            const users = UserService.getAllUsers();
+            const users = await UserService.getAllUsers(); // ✅ await added
 
             return res.status(200).json({
                 success: true,
@@ -94,7 +94,8 @@ export class UserController {
     async getUser(req: Request, res: Response) {
         try {
             const { uid } = req.params;
-            const user = UserService.getUserByEmail(uid); // OR getUserByUid if you add it
+
+            const user = await UserService.getUserByEmail(uid); 
 
             if (!user) {
                 return res.status(404).json({
@@ -144,7 +145,7 @@ export class UserController {
     async deleteUser(req: Request, res: Response) {
         try {
             const { uid } = req.params;
-            const deleted = UserService.deleteUser(uid);
+            const deleted = await UserService.deleteUser(uid); // ✅ await added
 
             if (!deleted) {
                 return res.status(404).json({

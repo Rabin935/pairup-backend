@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { number, z } from "zod";
 import bcrypt from "bcryptjs";
 
 /* -------------------- ZOD SCHEMA -------------------- */
@@ -6,6 +6,7 @@ export const UserSchema = z.object({
   uid: z.string().min(1, "UID is required"),
   fullName: z.string().min(1, "Full name is required"),
   email: z.string().email("Invalid email format"),
+  number: z.string().min(1, "Phone number is required"),
   authProvider: z.string().min(1, "Auth provider is required"),
   role: z.enum(["admin", "user"]).default("user"),
   password: z.string().min(6, "Password must be at least 6 characters"),

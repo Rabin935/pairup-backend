@@ -11,6 +11,7 @@ export const RegisterDto = UserSchema.pick({
   fullName: true,
   // username: true,
   email: true,
+  number: true,
   authProvider: true,
   role: true,
   password: true,

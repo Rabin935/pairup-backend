@@ -8,6 +8,7 @@ import { required } from "zod/v4/core/util.cjs";
             uid: { type: String, required: false, unique: true, index: true },
             fullName: { type: String, required: true },
             email: { type: String, required: true, unique: true, index: true, lowercase: true, trim: true },
+            number: { type: String, required: true },
             password: { type: String, required: true },
             authProvider: { type: String, required: true },
             
