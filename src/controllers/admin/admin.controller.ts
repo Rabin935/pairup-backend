@@ -39,4 +39,3 @@ export const deleteUser = async (req: Request, res: Response) => {
  const user = await User.findByIdAndDelete(req.params.id);
  res.json(user);
 };
-
