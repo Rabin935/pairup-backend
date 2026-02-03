@@ -62,4 +62,24 @@ export class AuthService {
 
     return { token, user };
   }
+
+  /**
+   * Update user profile
+   */
+  async updateProfile(userId: string, data: any) {
+    // Check if user exists
+    const user = await userRepository.getUserById(userId);
+    if (!user) {
+      throw new HttpError(404, "User not found");
+    }
+
+    // If password is being updated, hash it
+    if (data.password) {
+      data.password = await bcrypt.hash(data.password, 10);
+    }
+
+    // Update user in repository
+    const updatedUser = await userRepository.updateProfile(userId, data);
+    return updatedUser;
+  }
 }

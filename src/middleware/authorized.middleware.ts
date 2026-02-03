@@ -20,23 +20,25 @@ export const authorizedMiddleware = (
   try {
     // user is attached by auth middleware
     if (!req.user) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         message: "Not authenticated",
       });
+      return;
     }
 
     // Check role
     if (req.user.role !== "admin") {
-      return res.status(403).json({
+      res.status(403).json({
         success: false,
         message: "Admin access only",
       });
+      return;
     }
 
     next();
   } catch (error) {
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: "Authorization failed",
     });

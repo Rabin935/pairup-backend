@@ -1,7 +1,9 @@
 import { AuthService } from "../services/auth.service";
 import { CreateUserDto, LoginUserDto} from "../dtos/user.dto";
 import z from "zod";
-import { Request, Response } from "express";
+import { NextFunction, Request, RequestHandler, Response } from "express";
+import { ParamsDictionary } from "express-serve-static-core";
+import { ParsedQs } from "qs";
 
 
 
@@ -36,6 +38,25 @@ export class AuthController{
             const { token , user } = await authService.loginUser(parsedData.data);
             return res.status(200).json(
                 { success: true, data: user, token, message: "Login success" }
+            )
+        }catch(error: Error | any){
+            return res.status(error.statusCode || 500).json(
+                { success: false, message: error.message || "Internal Server Error" }
+            )
+        }
+    }
+    async updateProfile(req: Request, res: Response){
+        try{
+            const { id } = req.params;
+            const image = req.file?.path;
+            
+            const updatedUser = await authService.updateProfile(id, {
+                ...req.body,
+                image
+            });
+            
+            return res.status(200).json(
+                { success: true, data: updatedUser, message: "Profile updated successfully" }
             )
         }catch(error: Error | any){
             return res.status(error.statusCode || 500).json(
