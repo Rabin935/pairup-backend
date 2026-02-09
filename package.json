@@ -1,15 +1,12 @@
 {
+  "name": "pairup-backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "PairUp Backend API",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon src/index.ts",
-  "name": "35c-backend",
-  "version": "1.0.0",
-  "main": "index.js",
+  "type": "commonjs",
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
+    "seed": "ts-node src/seeds/createAdmin.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -19,42 +16,24 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/mongoose": "^5.11.96",
-    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "mongodb": "^7.0.0",
     "mongoose": "^9.0.2",
-    "ts-node": "^10.9.2",
-    "zod": "^4.2.1"
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^13.0.0",
+    "zod": "^4.3.4"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/multer": "^1.4.13",
     "@types/node": "^25.0.3",
     "nodemon": "^3.1.11",
+    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.3"
-  },
-  "description": "",
-  "devDependencies": {
-    "@types/express": "^5.0.6",
-    "@types/node": "^24.10.4",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
-  },
-  "dependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "@types/jsonwebtoken": "^9.0.10",
-    "bcryptjs": "^3.0.3",
-    "dotenv": "^17.2.3",
-    "express": "^5.2.1",
-    "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.0.2",
-    "zod": "^4.3.4"
-  },
-  "type": "commonjs"
-}
+  }
 }
