@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const PORT: number = 
-process.env.PORT ? parseInt(process.env.PORT): 3000;
+process.env.PORT ? parseInt(process.env.PORT): 5000;
 
 export const MONGO_URI: string =
 process.env.MONGO_URI || 'mongodb+srv://ttrabin935_db_user:DW6AqoVctjtKXeND@cluster0.92eh3by.mongodb.net/test';

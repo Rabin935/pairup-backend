@@ -6,7 +6,7 @@ import { UserSchema } from "../types/user.type";
  * Re-uses UserSchema and adds confirmPassword
  */
 export const CreateUserDto = UserSchema.pick({
-  // uid: true,
+  uid: true,
   firstname: true,
   lastname: true,
   email: true,
@@ -14,6 +14,7 @@ export const CreateUserDto = UserSchema.pick({
   authProvider: true,
   password: true,
 }).extend({
+  uid: z.string().optional(),
   confirmPassword: z.string().min(6, {
     message: "Confirm password must be at least 6 characters",
   }),
