@@ -16,6 +16,9 @@ export interface IUserRepository {
  * User repository implementation
  */
 export class UserRepository implements IUserRepository {
+  updateProfile(userId: string, data: any) {
+    throw new Error("Method not implemented.");
+  }
   /**
    * Create a new user
    */
