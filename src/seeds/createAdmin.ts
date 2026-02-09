@@ -20,7 +20,7 @@ async function createAdmin() {
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash("Admin@123", 10);
+    const hashedPassword = await bcrypt.hash("admin@123", 10);
 
     // Create admin user
     const admin = new UserModel({
