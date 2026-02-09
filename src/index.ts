@@ -39,7 +39,6 @@ async function startServer() {
 }
 
 startServer();
-=======
 import express , { Application, Request, Response } from 'express';
 import  bookRoutes  from './routes/book.route';
 import { connectDB } from './database/mongodb';
@@ -85,4 +84,3 @@ async function startServer() {
 
 startServer();
 
->>>>>>> sprint-4
