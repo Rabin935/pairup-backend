@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import express, { Application, Request, Response } from "express";
 import cors from 'cors';
 import { connectDB } from "./database/mongodb";
@@ -7,12 +6,14 @@ import { PORT } from "./config";
 
 import authRoutes from "./routes/auth.routes";
 import userRoutes from "./routes/user.route";
+import adminRoutes from "./routes/admin/admin.route";
 
 const app: Application = express();
 
 app.use(cors({
   origin: [
     'http://10.0.2.2:3000',  // Android Emulator
+    'http://localhost:3001', 
     'http://localhost:3000',  // Flutter web
     '*'                       // Allow all (dev only)
   ],
@@ -23,13 +24,13 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-app.get("/", (_req: Request, res: Response) => {
-  res.send("Hello, World!");
-});
 
 // routes
 app.use("/api/auth", authRoutes);
-app.use("/api/auth", userRoutes); // 👈 IMPORTANT
+app.use("/api/auth", userRoutes);
+app.use("/api/admin", adminRoutes);
+// Allow admin dashboard to call endpoints without the /api/admin prefix (dev convenience)
+app.use("/", adminRoutes);
 
 async function startServer() {
   await connectDB();
@@ -39,50 +40,4 @@ async function startServer() {
 }
 
 startServer();
-=======
-import express , { Application, Request, Response } from 'express';
-import  bookRoutes  from './routes/book.route';
-import { connectDB } from './database/mongodb';
-import bodyParser from 'body-parser';
-import { PORT } from './config';
 
-import authRoutes from './routes/auth.routes';
-
-
-
-
-// dotenv.config();
-
-const app: Application = express();
-// const PORT: number = 3000;
-
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({extended: true}));
-
-app.get('/', (req: Request, res: Response) => {
-    res.send('Hello, World!');
-});
-
-
-
-
-
-app.use('/api/books', bookRoutes); 
-app.use('/api/auth', authRoutes);
-
-
-
-
-async function startServer() {
-    await connectDB();
-    app.listen(
-    PORT, 
-    () => {
-        console.log(`Server on http://localhost:${PORT}`);
-    }
-);
-}
-
-startServer();
-
->>>>>>> sprint-4

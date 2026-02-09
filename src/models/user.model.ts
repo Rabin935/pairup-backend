@@ -11,8 +11,8 @@ const UserSchema: Schema = new Schema(
   {
     uid: {
       type: String,
+      required: true,
       unique: true,
-      sparse: true, // allows multiple null values
       index: true,
     },
 

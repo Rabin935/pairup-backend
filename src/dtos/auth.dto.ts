@@ -7,7 +7,7 @@ import { UserSchema } from "../types/user.type";
  * ============================
  */
 export const RegisterDto = UserSchema.pick({
-  // uid: true,
+  uid: true,
   firstname: true,
   lastname: true,
   email: true,

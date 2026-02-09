@@ -1,4 +1,7 @@
 import { Request, Response, NextFunction } from "express";
+import jwt, { JwtPayload } from "jsonwebtoken";
+import { JWT_SECRET } from "../config";
+import { UserModel } from "../models/user.model";
 
 declare global {
   namespace Express {
@@ -12,35 +15,72 @@ declare global {
   }
 }
 
-export const authorizedMiddleware = (
+interface DecodedToken extends JwtPayload {
+  id: string;
+}
+
+export const authorizedMiddleware = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    // user is attached by auth middleware
-    if (!req.user) {
+    const token = extractToken(req);
+
+    if (!token) {
       res.status(401).json({
         success: false,
-        message: "Not authenticated",
+        message: "Authorization token missing",
       });
       return;
     }
 
-    // Check role
-    if (req.user.role !== "admin") {
-      res.status(403).json({
+    const decoded = jwt.verify(token, JWT_SECRET) as DecodedToken;
+
+    const user = await UserModel.findById(decoded.id);
+    if (!user) {
+      res.status(401).json({
         success: false,
-        message: "Admin access only",
+        message: "User not found",
       });
       return;
     }
+
+    req.user = {
+      id: user.uid,
+      role: user.role,
+      email: user.email,
+      firstname: user.firstname,
+      lastname: user.lastname,
+    };
 
     next();
   } catch (error) {
-    res.status(500).json({
+    res.status(401).json({
       success: false,
-      message: "Authorization failed",
+      message: "Invalid or expired token",
     });
   }
+};
+
+const extractToken = (req: Request): string | null => {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    return authHeader.split(" ")[1];
+  }
+
+  const headerToken = req.headers["x-access-token"];
+  if (typeof headerToken === "string" && headerToken.length > 0) {
+    return headerToken;
+  }
+
+  if (typeof req.query.token === "string" && req.query.token.length > 0) {
+    return req.query.token;
+  }
+
+  if (req.body && typeof req.body.token === "string" && req.body.token.length > 0) {
+    return req.body.token;
+  }
+
+  return null;
 };

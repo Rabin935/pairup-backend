@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { HttpError } from "../error/http-error";
 import { JWT_SECRET } from "../config";
 import { UserRepository } from "../repositories/auth.repository";
+import { v4 as uuidv4 } from "uuid";
 
 const userRepository = new UserRepository();
 
@@ -23,6 +24,9 @@ export class AuthService {
     // if (usernameExists) {
     //   throw new HttpError(701, "Username already exists");
     // }
+
+    // Generate unique uid
+    data.uid = uuidv4();
 
     // Hash the password before saving
     const hashedPassword = await bcrypt.hash(data.password, 10);
@@ -53,7 +57,7 @@ export class AuthService {
     const payload = {
       id: user._id,
       email: user.email,
-      fistname: user.firstname,
+      firstname: user.firstname,
       lastname: user.lastname,
       role: user.role,
     };
