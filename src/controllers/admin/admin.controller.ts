@@ -40,12 +40,27 @@ export class AdminController {
    */
   async getAllUsers(req: Request, res: Response) {
     try {
-      const users = await adminService.getAllUsers();
+      const parsedPage = parseInt(req.query.page as string, 10);
+      const parsedLimit = parseInt(req.query.limit as string, 10);
+
+      const page = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
+      const limit = Number.isNaN(parsedLimit) || parsedLimit < 1 ? 10 : parsedLimit;
+      const skip = (page - 1) * limit;
+
+      const [users, total] = await Promise.all([
+        User.find().select("-password").skip(skip).limit(limit),
+        User.countDocuments(),
+      ]);
+
       return res.status(200).json({
         success: true,
         data: users,
-        count: users.length,
-        message: "Users retrieved successfully",
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+        },
       });
     } catch (error: Error | any) {
       return res.status(error.statusCode || 500).json({
