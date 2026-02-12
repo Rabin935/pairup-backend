@@ -48,7 +48,7 @@ export class UserRepository implements IUserRepository {
    * Find user by userId
    */
   async getUserById(userId: string): Promise<IUser | null> {
-    const user = await UserModel.findOne({ userId });
+    const user = await UserModel.findById(userId);
     return user;
   }
 
@@ -63,7 +63,7 @@ export class UserRepository implements IUserRepository {
    * Delete user by userId
    */
   async deleteUser(userId: string): Promise<boolean> {
-    const result = await UserModel.deleteOne({ userId });
+    const result = await UserModel.deleteOne({ _id: userId });
     return result.deletedCount === 1;
   }
 }
