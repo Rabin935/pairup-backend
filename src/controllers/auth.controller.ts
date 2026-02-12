@@ -3,6 +3,7 @@ import z from "zod";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { sendEmail } from "../config/email";
+import { CLIENT_APP_URL } from "../config";
 import { AuthService } from "../services/auth.service";
 import { CreateUserDto, LoginUserDto } from "../dtos/user.dto";
 import { UserModel } from "../models/user.model";
@@ -96,7 +97,9 @@ export class AuthController {
         user.resetPasswordExpire = new Date(Date.now() + PASSWORD_RESET_WINDOW_MS);
         await user.save({ validateBeforeSave: false });
 
-        const resetUrl = `http://localhost:5000/reset-password/${resetToken}`;
+        
+        const resetUrl = `${CLIENT_APP_URL}/reset-password/${resetToken}`;
+        
 
         try {
           await sendEmail(
@@ -105,8 +108,8 @@ export class AuthController {
             `
             <p>You requested a password reset.</p>
             <p>Click the link below (valid for 15 minutes):</p>
-            <a href="${resetUrl}">${resetUrl}</a>
-            <p>If you did not request this, you can safely ignore this email.</p>
+            <p><a href="${resetUrl}" target="_blank" rel="noopener noreferrer">Link</a></p>
+                <p>If you did not request this, you can safely ignore this email.</p>
           `
           );
         } catch (mailError) {
