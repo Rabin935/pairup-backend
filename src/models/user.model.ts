@@ -5,6 +5,8 @@ export interface IUser extends UserType, Document {
   _id: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
+  resetPasswordToken?: string;
+  resetPasswordExpire?: Date;
 }
 
 const UserSchema: Schema = new Schema(
@@ -64,10 +66,20 @@ const UserSchema: Schema = new Schema(
       type: String,
       default: "",
     },
+    resetPasswordToken: {
+      type: String,
+      select: false,
+    },
+    resetPasswordExpire: {
+      type: Date,
+      select: false,
+    },
   },
   {
     timestamps: true,
   }
+  
+
 );
 
 export const UserModel = mongoose.model<IUser>("User", UserSchema);
