@@ -87,45 +87,52 @@ export class AuthController {
       const user = await UserModel.findOne({ email: normalizedEmail });
 
       if (user) {
-        const resetToken = crypto.randomBytes(32).toString("hex");
-        const hashedToken = crypto
-          .createHash("sha256")
-          .update(resetToken)
-          .digest("hex");
-
-        user.resetPasswordToken = hashedToken;
-        user.resetPasswordExpire = new Date(Date.now() + PASSWORD_RESET_WINDOW_MS);
-        await user.save({ validateBeforeSave: false });
-
-        
-        const resetUrl = `${CLIENT_APP_URL}/reset-password/${resetToken}`;
-        
-
         try {
-          await sendEmail(
-            user.email,
-            "Password Reset Instructions",
-            `
-            <p>You requested a password reset.</p>
-            <p>Click the link below (valid for 15 minutes):</p>
-            <p><a href="${resetUrl}" target="_blank" rel="noopener noreferrer">Link</a></p>
-                <p>If you did not request this, you can safely ignore this email.</p>
-          `
-          );
-        } catch (mailError) {
-          console.error("Forgot-password email failed", mailError);
-          user.resetPasswordToken = undefined;
-          user.resetPasswordExpire = undefined;
+          const resetToken = crypto.randomBytes(32).toString("hex");
+          const hashedToken = crypto
+            .createHash("sha256")
+            .update(resetToken)
+            .digest("hex");
+
+          user.resetPasswordToken = hashedToken;
+          user.resetPasswordExpire = new Date(Date.now() + PASSWORD_RESET_WINDOW_MS);
           await user.save({ validateBeforeSave: false });
+
+          const resetUrl = `${CLIENT_APP_URL}/reset-password/${resetToken}`;
+
+          try {
+            await sendEmail(
+              user.email,
+              "Password Reset Instructions",
+              `
+              <p>You requested a password reset.</p>
+              <p>Click the link below (valid for 15 minutes):</p>
+              <p><a href="${resetUrl}" target="_blank" rel="noopener noreferrer">Reset Password Link</a></p>
+              <p>If you did not request this, you can safely ignore this email.</p>
+            `
+            );
+          } catch (mailError: any) {
+            console.error("Forgot-password email failed:", mailError.message);
+            user.resetPasswordToken = undefined;
+            user.resetPasswordExpire = undefined;
+            await user.save({ validateBeforeSave: false });
+            return res.status(500).json({
+              success: false,
+              message: "Unable to send reset email. Please try again later.",
+            });
+          }
+        } catch (saveError: any) {
+          console.error("Forgot-password save error:", saveError.message);
           return res.status(500).json({
             success: false,
-            message: "Unable to send reset email. Please try again later.",
+            message: "An error occurred. Please try again later.",
           });
         }
       }
 
       return res.status(200).json(safeResponse);
     } catch (error: Error | any) {
+      console.error("Forgot-password unexpected error:", error.message);
       return res.status(error.statusCode || 500).json({
         success: false,
         message: error.message || "Internal Server Error",
