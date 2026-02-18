@@ -39,6 +39,96 @@ export class UserController {
 		}
 	};
 
+	updateProfile = async (req: Request, res: Response): Promise<void> => {
+		try {
+			const query = req.user?.id
+				? { uid: req.user.id }
+				: req.user?.email
+				? { email: req.user.email }
+				: null;
+
+			if (!query) {
+				res.status(401).json({ success: false, message: "Unauthorized" });
+				return;
+			}
+
+			const user = await UserModel.findOne(query);
+			if (!user) {
+				res.status(404).json({ success: false, message: "User not found" });
+				return;
+			}
+
+			const { gender, age, location, interests, bio } = req.body;
+
+			if (typeof gender === "string" && gender.trim()) {
+				const normalizedGender = gender.trim().toLowerCase();
+				const allowedGenders = ["male", "female", "other"];
+				if (!allowedGenders.includes(normalizedGender)) {
+					res.status(400).json({
+						success: false,
+						message: "Invalid gender value",
+					});
+					return;
+				}
+				user.gender = normalizedGender as typeof user.gender;
+			}
+
+			if (typeof age !== "undefined") {
+				const parsedAge = Number(age);
+				if (Number.isNaN(parsedAge) || parsedAge <= 0) {
+					res.status(400).json({
+						success: false,
+						message: "Age must be a positive number",
+					});
+					return;
+				}
+				user.age = parsedAge;
+			}
+
+			if (typeof location === "string") {
+				user.location = location.trim();
+			}
+
+			if (typeof bio === "string") {
+				user.bio = bio.trim();
+			}
+
+			if (typeof interests !== "undefined") {
+				const parsedInterests = Array.isArray(interests)
+					? interests
+						.map((item) => item.toString().trim())
+						.filter(Boolean)
+					: (interests as string)
+						.split(",")
+						.map((item) => item.trim())
+						.filter(Boolean);
+				user.interests = parsedInterests;
+			}
+
+			if (req.file?.filename) {
+				user.profileImage = req.file.filename;
+			}
+
+			user.isProfileComplete = Boolean(user.gender && user.age && user.location);
+
+			await user.save();
+
+			const { password, ...safeUser } = user.toObject();
+
+			res.status(200).json({
+				success: true,
+				message: "Profile updated successfully",
+				data: safeUser,
+			});
+		} catch (error) {
+			res.status(500).json({
+				success: false,
+				message: "Unable to update profile",
+				error: (error as Error).message,
+			});
+		}
+	};
+
 	getAllUsers = async (_req: Request, res: Response): Promise<void> => {
 		try {
 			const users = UserService.getAllUsers();

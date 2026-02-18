@@ -1,12 +1,19 @@
 import { Router } from "express";
 import { UserController } from "../controllers/user.controller";
 import { authorizedMiddleware } from "../middleware/authorized.middleware";
+import { upload } from "../middleware/multer";
 
 
 const router = Router();
 const userController = new UserController();
 
 router.get("/me", authorizedMiddleware, userController.getCurrentUser);
+router.put(
+	"/update-profile",
+	authorizedMiddleware,
+	upload.single("profileImage"),
+	userController.updateProfile
+);
 
 router.get("/getAllUsers", userController.getAllUsers);
 router.get("/users/:uid", userController.getUser);

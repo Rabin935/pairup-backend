@@ -1,4 +1,4 @@
-import { number, z } from "zod";
+import { z } from "zod";
 
 // Import your schema
 export const UserSchema = z.object({
@@ -10,6 +10,13 @@ export const UserSchema = z.object({
   authProvider: z.string().min(1, { error: "Auth provider is required" }),
   role: z.enum(["admin", "user"]).default("user"),
   password: z.string().min(6, { error: "Password must be at least 6 char long" }),
+  gender: z.enum(["male", "female", "other"]).optional(),
+  age: z.number().int().positive().optional(),
+  location: z.string().optional(),
+  interests: z.array(z.string()).default([]),
+  bio: z.string().optional(),
+  profileImage: z.string().default(""),
+  isProfileComplete: z.boolean().default(false),
   createdAt: z.date().default(() => new Date()),
   updatedAt: z.date().default(() => new Date()),
 });
