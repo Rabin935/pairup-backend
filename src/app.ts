@@ -1,6 +1,7 @@
 import express, { Application } from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
+import path from "path";
 
 import authRoutes from "./routes/auth.routes";
 import userRoutes from "./routes/user.route";
@@ -24,6 +25,8 @@ export function createApp(): Application {
 
   app.use(bodyParser.json());
   app.use(bodyParser.urlencoded({ extended: true }));
+
+  app.use("/uploads", express.static(path.resolve(__dirname, "../uploads")));
 
   // Routes
   app.use("/api/auth", authRoutes);
