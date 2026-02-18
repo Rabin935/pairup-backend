@@ -66,6 +66,41 @@ const UserSchema: Schema = new Schema(
       type: String,
       default: "",
     },
+
+    gender: {
+      type: String,
+      enum: ["male", "female", "other"],
+    },
+
+    age: {
+      type: Number,
+    },
+
+    location: {
+      type: String,
+      trim: true,
+    },
+
+    interests: {
+      type: [String],
+      default: [],
+    },
+
+    bio: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    profileImage: {
+      type: String,
+      default: "",
+    },
+
+    isProfileComplete: {
+      type: Boolean,
+      default: false,
+    },
     resetPasswordToken: {
       type: String,
       select: false,
