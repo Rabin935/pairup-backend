@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 
+import { UserModel } from "../models/user.model";
 import { UserService } from "../services/user.service";
 
 export class UserController {
@@ -8,6 +9,35 @@ export class UserController {
 	constructor(userService: UserService = new UserService()) {
 		this.userService = userService;
 	}
+
+	getCurrentUser = async (req: Request, res: Response): Promise<void> => {
+		try {
+			const query = req.user?.id
+				? { uid: req.user.id }
+				: req.user?.email
+				? { email: req.user.email }
+				: null;
+
+			if (!query) {
+				res.status(401).json({ success: false, message: "Unauthorized" });
+				return;
+			}
+
+			const user = await UserModel.findOne(query).select("-password");
+			if (!user) {
+				res.status(404).json({ success: false, message: "User not found" });
+				return;
+			}
+
+			res.status(200).json({ success: true, data: user });
+		} catch (error) {
+			res.status(500).json({
+				success: false,
+				message: "Unable to retrieve profile",
+				error: (error as Error).message,
+			});
+		}
+	};
 
 	getAllUsers = async (_req: Request, res: Response): Promise<void> => {
 		try {
