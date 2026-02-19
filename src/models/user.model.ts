@@ -102,6 +102,28 @@ const UserSchema: Schema = new Schema(
       default: "",
     },
 
+    images: {
+      type: [
+        {
+          url: {
+            type: String,
+            required: true,
+            trim: true,
+          },
+          public_id: {
+            type: String,
+            required: true,
+            trim: true,
+          },
+          isThumbnail: {
+            type: Boolean,
+            default: false,
+          },
+        },
+      ],
+      default: [],
+    },
+
     isProfileComplete: {
       type: Boolean,
       default: false,

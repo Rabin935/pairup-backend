@@ -17,6 +17,15 @@ export const UserSchema = z.object({
   bio: z.string().optional(),
   profileImage: z.string().default(""),
   profileImagePublicId: z.string().default(""),
+  images: z
+    .array(
+      z.object({
+        url: z.string().min(1, { error: "Image URL is required" }),
+        public_id: z.string().min(1, { error: "Cloudinary public_id is required" }),
+        isThumbnail: z.boolean().default(false),
+      })
+    )
+    .default([]),
   isProfileComplete: z.boolean().default(false),
   createdAt: z.date().default(() => new Date()),
   updatedAt: z.date().default(() => new Date()),
