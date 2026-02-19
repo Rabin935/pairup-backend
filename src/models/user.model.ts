@@ -1,12 +1,19 @@
 import mongoose, { Document, Schema } from "mongoose";
 import { UserType } from "../types/user.type";
 
-export interface IUser extends UserType, Document {
+type UserImageType = UserType["images"][number];
+
+export interface IUserImage extends UserImageType {
+  _id?: mongoose.Types.ObjectId;
+}
+
+export interface IUser extends Omit<UserType, "images">, Document {
   _id: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
   resetPasswordToken?: string;
   resetPasswordExpire?: Date;
+  images: IUserImage[];
 }
 
 const UserSchema: Schema = new Schema(

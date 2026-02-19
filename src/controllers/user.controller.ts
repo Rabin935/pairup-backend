@@ -248,5 +248,68 @@ export class UserController {
 			res.status(500).json({ message: (error as Error).message });
 		}
 	};
+
+	setThumbnailImage = async (req: Request, res: Response): Promise<void> => {
+		try {
+			const { imageId } = req.params;
+			if (!imageId) {
+				res.status(400).json({ success: false, message: "Image ID is required" });
+				return;
+			}
+
+			const query = req.user?.id
+				? { uid: req.user.id }
+				: req.user?.email
+				? { email: req.user.email }
+				: null;
+
+			if (!query) {
+				res.status(401).json({ success: false, message: "Unauthorized" });
+				return;
+			}
+
+			const user = await UserModel.findOne(query);
+			if (!user || !Array.isArray(user.images) || user.images.length === 0) {
+				res.status(404).json({ success: false, message: "No images available for this user" });
+				return;
+			}
+
+			let selectedImage: typeof user.images[number] | undefined;
+			user.images.forEach((img) => {
+				img.isThumbnail = false;
+				if (img._id?.toString() === imageId || img.public_id === imageId) {
+					selectedImage = img;
+				}
+			});
+
+			if (!selectedImage) {
+				res.status(404).json({ success: false, message: "Image not found" });
+				return;
+			}
+
+			selectedImage.isThumbnail = true;
+			await user.save();
+
+			const {
+				password,
+				profileImagePublicId,
+				resetPasswordToken,
+				resetPasswordExpire,
+				...safeUser
+			} = user.toObject();
+
+			res.status(200).json({
+				success: true,
+				message: "Thumbnail updated successfully",
+				data: safeUser,
+			});
+		} catch (error) {
+			res.status(500).json({
+				success: false,
+				message: "Unable to set thumbnail",
+				error: (error as Error).message,
+			});
+		}
+	};
 }
 

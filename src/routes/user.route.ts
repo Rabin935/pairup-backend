@@ -22,6 +22,12 @@ router.post(
 	userController.uploadUserImages
 );
 
+router.patch(
+	"/set-thumbnail/:imageId",
+	authorizedMiddleware,
+	userController.setThumbnailImage
+);
+
 router.get("/getAllUsers", userController.getAllUsers);
 router.get("/users/:uid", userController.getUser);
 router.put("/users/:uid", userController.updateUser);
