@@ -16,6 +16,7 @@ export const UserSchema = z.object({
   interests: z.array(z.string()).default([]),
   bio: z.string().optional(),
   profileImage: z.string().default(""),
+  profileImagePublicId: z.string().default(""),
   isProfileComplete: z.boolean().default(false),
   createdAt: z.date().default(() => new Date()),
   updatedAt: z.date().default(() => new Date()),

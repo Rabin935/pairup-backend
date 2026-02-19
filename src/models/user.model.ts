@@ -97,6 +97,11 @@ const UserSchema: Schema = new Schema(
       default: "",
     },
 
+    profileImagePublicId: {
+      type: String,
+      default: "",
+    },
+
     isProfileComplete: {
       type: Boolean,
       default: false,

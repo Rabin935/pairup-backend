@@ -30,7 +30,7 @@ export function createApp(): Application {
 
   // Routes
   app.use("/api/auth", authRoutes);
-  app.use("/api/auth", userRoutes);
+  app.use("/api/users", userRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/", adminRoutes);
 

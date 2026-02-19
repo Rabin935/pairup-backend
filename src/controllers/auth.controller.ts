@@ -51,23 +51,22 @@ export class AuthController {
   }
 
   async updateProfile(req: Request, res: Response) {
-     try{
-            const { id } = req.params;
-            const image = req.file?.path;
-            
-            const updatedUser = await authService.updateProfile(id, {
-                ...req.body,
-                image
-            });
-            
-            return res.status(200).json(
-                { success: true, data: updatedUser, message: "Profile updated successfully" }
-            )
-        }catch(error: Error | any){
-            return res.status(error.statusCode || 500).json(
-                { success: false, message: error.message || "Internal Server Error" }
-            )
-        }
+    try {
+      const { id } = req.params;
+
+      const updatedUser = await authService.updateProfile(id, req.body, req.file);
+
+      return res.status(200).json({
+        success: true,
+        data: updatedUser,
+        message: "Profile updated successfully",
+      });
+    } catch (error: Error | any) {
+      return res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || "Internal Server Error",
+      });
+    }
   }
 
   async forgotPassword(req: Request, res: Response) {

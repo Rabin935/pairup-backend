@@ -10,14 +10,15 @@ export interface IUserRepository {
   getUserById(userId: string): Promise<IUser | null>;
   getAllUsers(): Promise<IUser[]>;
   deleteUser(userId: string): Promise<boolean>;
+  updateProfile(userId: string, data: Partial<IUser>): Promise<IUser | null>;
 }
 
 /**
  * User repository implementation
  */
 export class UserRepository implements IUserRepository {
-  updateProfile(userId: string, data: any) {
-    throw new Error("Method not implemented.");
+  async updateProfile(userId: string, data: Partial<IUser>): Promise<IUser | null> {
+    return UserModel.findByIdAndUpdate(userId, data, { new: true });
   }
   /**
    * Create a new user

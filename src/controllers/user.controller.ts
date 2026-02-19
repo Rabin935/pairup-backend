@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 
 import { UserModel } from "../models/user.model";
 import { UserService } from "../services/user.service";
+import { CloudinaryService } from "../services/cloudinary.service";
 
 export class UserController {
 	private userService: UserService;
@@ -23,7 +24,7 @@ export class UserController {
 				return;
 			}
 
-			const user = await UserModel.findOne(query).select("-password");
+			const user = await UserModel.findOne(query).select("-password -profileImagePublicId");
 			if (!user) {
 				res.status(404).json({ success: false, message: "User not found" });
 				return;
@@ -105,15 +106,21 @@ export class UserController {
 				user.interests = parsedInterests;
 			}
 
-			if (req.file?.filename) {
-				user.profileImage = req.file.filename;
+			if (req.file) {
+				const previousPublicId = user.profileImagePublicId;
+				const uploaded = await CloudinaryService.uploadImage(req.file);
+				user.profileImage = uploaded.url;
+				user.profileImagePublicId = uploaded.publicId;
+				if (previousPublicId && previousPublicId !== uploaded.publicId) {
+					await CloudinaryService.deleteImage(previousPublicId);
+				}
 			}
 
 			user.isProfileComplete = Boolean(user.gender && user.age && user.location);
 
 			await user.save();
 
-			const { password, ...safeUser } = user.toObject();
+			const { password, profileImagePublicId, ...safeUser } = user.toObject();
 
 			res.status(200).json({
 				success: true,

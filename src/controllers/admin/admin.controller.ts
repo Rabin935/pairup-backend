@@ -3,6 +3,7 @@ import { AdminService } from "../../services/admin.service";
 import { LoginUserDto } from "../../dtos/user.dto";
 import z from "zod";
 import { UserModel as User } from "../../models/user.model";
+import { CloudinaryService } from "../../services/cloudinary.service";
 
 const adminService = new AdminService();
 
@@ -118,11 +119,17 @@ export class AdminController {
     next: NextFunction
   ) {
     try {
-      const image = req.file?.path;
+      let uploadedImage: { url: string; publicId: string } | null = null;
+
+      if (req.file) {
+        uploadedImage = await CloudinaryService.uploadImage(req.file);
+      }
 
       const user = await User.create({
         ...req.body,
-        image,
+        image: uploadedImage?.url || "",
+        profileImage: uploadedImage?.url || "",
+        profileImagePublicId: uploadedImage?.publicId || "",
       });
 
       return res.status(201).json({
@@ -144,13 +151,25 @@ export class AdminController {
   async updateUser(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const data = req.body;
+      const updates = { ...req.body } as Record<string, unknown>;
 
-      if (req.file) {
-        data.image = req.file.path;
+      const existingUser = await User.findById(id);
+      if (!existingUser) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
       }
 
-      const user = await User.findByIdAndUpdate(id, data, { new: true });
+      if (req.file) {
+        const uploaded = await CloudinaryService.uploadImage(req.file);
+        updates.image = uploaded.url;
+        updates.profileImage = uploaded.url;
+        updates.profileImagePublicId = uploaded.publicId;
+        await CloudinaryService.deleteImage(existingUser.profileImagePublicId);
+      }
+
+      const user = await User.findByIdAndUpdate(id, updates, { new: true });
 
       return res.status(200).json({
         success: true,
