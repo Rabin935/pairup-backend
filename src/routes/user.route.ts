@@ -15,6 +15,13 @@ router.put(
 	userController.updateProfile
 );
 
+router.post(
+	"/upload-images",
+	authorizedMiddleware,
+	upload.array("images", 6),
+	userController.uploadUserImages
+);
+
 router.get("/getAllUsers", userController.getAllUsers);
 router.get("/users/:uid", userController.getUser);
 router.put("/users/:uid", userController.updateUser);

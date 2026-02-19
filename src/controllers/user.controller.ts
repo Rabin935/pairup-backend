@@ -136,6 +136,68 @@ export class UserController {
 		}
 	};
 
+	uploadUserImages = async (req: Request, res: Response): Promise<void> => {
+		try {
+			const query = req.user?.id
+				? { uid: req.user.id }
+				: req.user?.email
+				? { email: req.user.email }
+				: null;
+
+			if (!query) {
+				res.status(401).json({ success: false, message: "Unauthorized" });
+				return;
+			}
+
+			const user = await UserModel.findOne(query);
+			if (!user) {
+				res.status(404).json({ success: false, message: "User not found" });
+				return;
+			}
+
+			const files = (req.files as Express.Multer.File[]) || [];
+			if (!Array.isArray(files) || files.length === 0) {
+				res.status(400).json({ success: false, message: "No images uploaded" });
+				return;
+			}
+
+			const uploadResults = await Promise.all(
+				files.map((file) => CloudinaryService.uploadImage(file))
+			);
+
+			user.images = user.images || [];
+			const isFirstBatch = user.images.length === 0;
+			const imagesToAppend = uploadResults.map((result, index) => ({
+				url: result.url,
+				public_id: result.publicId,
+				isThumbnail: isFirstBatch && index === 0,
+			}));
+
+			user.images.push(...imagesToAppend);
+			await user.save();
+
+			const {
+				password,
+				profileImagePublicId,
+				resetPasswordToken,
+				resetPasswordExpire,
+				...safeUser
+			} = user.toObject();
+
+			res.status(200).json({
+				success: true,
+				message: "Images uploaded successfully",
+				data: safeUser,
+			});
+		} catch (error) {
+			res.status(500).json({
+				success: false,
+				message: "Unable to upload images",
+				error: (error as Error).message,
+			});
+		}
+	};
+
 	getAllUsers = async (_req: Request, res: Response): Promise<void> => {
 		try {
 			const users = UserService.getAllUsers();
