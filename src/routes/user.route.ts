@@ -7,6 +7,8 @@ import { upload } from "../middleware/multer";
 const router = Router();
 const userController = new UserController();
 
+router.get("/", userController.getAllUsers);
+router.get("/discover", authorizedMiddleware, userController.discoverUsers);
 router.get("/me", authorizedMiddleware, userController.getCurrentUser);
 router.put(
 	"/update-profile",
@@ -28,7 +30,6 @@ router.patch(
 	userController.setThumbnailImage
 );
 
-router.get("/getAllUsers", userController.getAllUsers);
 router.get("/users/:uid", userController.getUser);
 router.put("/users/:uid", userController.updateUser);
 router.delete("/users/:uid", userController.deleteUser);

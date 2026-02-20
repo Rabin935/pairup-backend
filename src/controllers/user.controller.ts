@@ -207,6 +207,56 @@ export class UserController {
 		}
 	};
 
+	discoverUsers = async (req: Request, res: Response): Promise<void> => {
+		try {
+			const query = req.user?.id
+				? { uid: req.user.id }
+				: req.user?.email
+				? { email: req.user.email }
+				: null;
+
+			if (!query) {
+				res.status(401).json({ success: false, message: "Unauthorized" });
+				return;
+			}
+
+			const currentUser = await UserModel.findOne(query).select("_id swipes");
+			if (!currentUser) {
+				res.status(404).json({ success: false, message: "User not found" });
+				return;
+			}
+
+			const swipedIds = (currentUser.swipes || [])
+				.map((swipe) => swipe.user)
+				.filter((id): id is typeof currentUser._id => Boolean(id));
+			const exclusionIds = [currentUser._id, ...swipedIds];
+
+			const discoverableUsers = await UserModel.find({
+				_id: { $nin: exclusionIds },
+				isProfileComplete: true,
+				"images.0": { $exists: true },
+			})
+				.select("_id firstname lastname age bio images")
+				.lean();
+
+			const formattedUsers = discoverableUsers.map((user) => ({
+				_id: user._id,
+				name: [user.firstname, user.lastname].filter(Boolean).join(" ").trim(),
+				age: user.age ?? null,
+				bio: user.bio ?? "",
+				images: user.images || [],
+			}));
+
+			res.status(200).json({ success: true, data: formattedUsers });
+		} catch (error) {
+			res.status(500).json({
+				success: false,
+				message: "Unable to fetch users",
+				error: (error as Error).message,
+			});
+		}
+	};
+
 	getUser = async (req: Request, res: Response): Promise<void> => {
 		try {
 			const { uid } = req.params;
