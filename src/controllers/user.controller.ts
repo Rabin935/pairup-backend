@@ -254,6 +254,9 @@ export class UserController {
 				return;
 			}
 
+			const includePreviousParam = String(req.query.includePrevious || "true").toLowerCase();
+			const includePrevious = includePreviousParam !== "false";
+
 			const swipeDocs = await SwipeModel.find({ swiper: currentUser._id })
 				.select("swipedUser")
 				.lean();
@@ -262,42 +265,68 @@ export class UserController {
 				.filter((id): id is typeof currentUser._id => Boolean(id));
 			const exclusionIds = [currentUser._id, ...swipedIds];
 
-			const discoverableUsers = await UserModel.find({
+			const formatUsers = (users: any[]) =>
+				users.flatMap((user) => {
+					const gallery = Array.isArray(user.images) ? user.images.filter(Boolean) : [];
+					const normalizedImages =
+						gallery.length > 0
+							? gallery
+							: user.profileImage
+							? [
+							      {
+							          url: user.profileImage,
+							          public_id: user.profileImagePublicId || user.profileImage,
+							          isThumbnail: true,
+							      },
+						      ]
+							: [];
+
+					if (normalizedImages.length === 0) {
+						return [];
+					}
+
+					return [
+						{
+							_id: user._id,
+							name: [user.firstname, user.lastname].filter(Boolean).join(" ").trim(),
+							age: user.age ?? null,
+							bio: user.bio ?? "",
+							images: normalizedImages,
+						},
+					];
+				});
+
+			const freshUsers = await UserModel.find({
 				_id: { $nin: exclusionIds },
 				isProfileComplete: true,
 			})
 				.select("_id firstname lastname age bio images profileImage profileImagePublicId")
 				.lean();
 
-			const formattedUsers = discoverableUsers.flatMap((user) => {
-				const gallery = Array.isArray(user.images) ? user.images.filter(Boolean) : [];
-				const normalizedImages =
-					gallery.length > 0
-						? gallery
-						: user.profileImage
-						? [
-						      {
-						          url: user.profileImage,
-						          public_id: user.profileImagePublicId || user.profileImage,
-						          isThumbnail: true,
-						      },
-					      ]
-						: [];
+			const previousUsers = includePrevious
+				? await UserModel.find({
+					_id: { $in: swipedIds },
+				})
+						.select("_id firstname lastname age bio images profileImage profileImagePublicId")
+						.lean()
+				: [];
 
-				if (normalizedImages.length === 0) {
-					return [];
-				}
+			const recycledUsers: typeof freshUsers = await UserModel.find({
+				_id: { $nin: [currentUser._id] },
+			})
+				.select("_id firstname lastname age bio images profileImage profileImagePublicId")
+				.limit(50)
+				.lean();
 
-				return [
-					{
-						_id: user._id,
-						name: [user.firstname, user.lastname].filter(Boolean).join(" ").trim(),
-						age: user.age ?? null,
-						bio: user.bio ?? "",
-						images: normalizedImages,
-					},
-				];
+			const seen = new Set<string>();
+			const merged = [...freshUsers, ...previousUsers, ...recycledUsers].filter((u) => {
+				const id = u._id.toString();
+				if (seen.has(id)) return false;
+				seen.add(id);
+				return true;
 			});
+
+			const formattedUsers = formatUsers(merged);
 
 			res.status(200).json({ success: true, data: formattedUsers });
 		} catch (error) {

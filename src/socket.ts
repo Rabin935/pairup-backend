@@ -8,6 +8,8 @@ import { ConversationModel } from "./models/conversation.model";
 
 type AuthedSocket = Socket & { user?: jwt.JwtPayload | string };
 
+let ioInstance: SocketIOServer | null = null;
+
 export function initSocket(httpServer: HTTPServer) {
   const io = new SocketIOServer(httpServer, {
     cors: {
@@ -16,6 +18,8 @@ export function initSocket(httpServer: HTTPServer) {
       credentials: true,
     },
   });
+
+  ioInstance = io;
 
   io.use(socketAuth);
 
@@ -88,4 +92,11 @@ export function initSocket(httpServer: HTTPServer) {
   });
 
   return io;
+}
+
+export function getIO(): SocketIOServer {
+  if (!ioInstance) {
+    throw new Error("Socket.io not initialized");
+  }
+  return ioInstance;
 }

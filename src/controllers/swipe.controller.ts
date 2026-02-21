@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 
 import { SwipeModel } from "../models/swipe.model";
 import { UserModel } from "../models/user.model";
+import { getIO } from "../socket";
 
 export class SwipeController {
   createSwipe = async (req: Request, res: Response): Promise<void> => {
@@ -68,6 +69,20 @@ export class SwipeController {
         await existingSwipe.save();
 
         res.status(200).json({ success: true, message: "Swipe preference updated" });
+
+        if (action === "like") {
+          try {
+            const io = getIO();
+            io.to(swipedUser._id.toString()).emit("matchRequest", {
+              fromUserId: swiperUser._id.toString(),
+              toUserId: swipedUser._id.toString(),
+              action,
+              type: "swipe", // for frontend filtering
+            });
+          } catch (notifyError) {
+            console.error("Failed to emit match request", notifyError);
+          }
+        }
         return;
       }
 
@@ -78,6 +93,20 @@ export class SwipeController {
       });
 
       res.status(201).json({ success: true, message: "Swipe saved" });
+
+      if (action === "like") {
+        try {
+          const io = getIO();
+          io.to(swipedUser._id.toString()).emit("matchRequest", {
+            fromUserId: swiperUser._id.toString(),
+            toUserId: swipedUser._id.toString(),
+            action,
+            type: "swipe", // for frontend filtering
+          });
+        } catch (notifyError) {
+          console.error("Failed to emit match request", notifyError);
+        }
+      }
     } catch (error) {
       res.status(500).json({
         success: false,
