@@ -7,12 +7,6 @@ export interface IUserImage extends UserImageType {
   _id?: mongoose.Types.ObjectId;
 }
 
-export interface IUserSwipe {
-  user: mongoose.Types.ObjectId;
-  action: "like" | "pass";
-  createdAt: Date;
-}
-
 export interface IUser extends Omit<UserType, "images">, Document {
   _id: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -20,28 +14,7 @@ export interface IUser extends Omit<UserType, "images">, Document {
   resetPasswordToken?: string;
   resetPasswordExpire?: Date;
   images: IUserImage[];
-  swipes: IUserSwipe[];
 }
-
-const SwipeSchema: Schema<IUserSwipe> = new Schema(
-  {
-    user: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    action: {
-      type: String,
-      enum: ["like", "pass"],
-      required: true,
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
-  },
-  { _id: false }
-);
 
 const UserSchema: Schema = new Schema(
   {
@@ -161,10 +134,6 @@ const UserSchema: Schema = new Schema(
     isProfileComplete: {
       type: Boolean,
       default: false,
-    },
-    swipes: {
-      type: [SwipeSchema],
-      default: [],
     },
     resetPasswordToken: {
       type: String,

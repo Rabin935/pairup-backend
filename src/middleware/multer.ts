@@ -7,8 +7,18 @@ const limits = {
 };
 
 const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
-  const allowed = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
-  if (allowed.includes(file.mimetype)) {
+  const allowed = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/jpg",
+    "image/heic",
+    "image/heif",
+    "image/avif",
+    "image/gif",
+  ];
+  const mimetype = (file.mimetype || "").toLowerCase();
+  if (allowed.includes(mimetype)) {
     return cb(null, true);
   }
   cb(new Error("Unsupported file type. Please upload a valid image."));

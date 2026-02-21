@@ -1,11 +1,13 @@
-import express, { Application } from "express";
+import express, { Application, NextFunction, Request, Response } from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import path from "path";
+import multer from "multer";
 
 import authRoutes from "./routes/auth.routes";
 import userRoutes from "./routes/user.route";
 import adminRoutes from "./routes/admin/admin.route";
+import swipeRoutes from "./routes/swipe.route";
 
 export function createApp(): Application {
   const app: Application = express();
@@ -31,8 +33,27 @@ export function createApp(): Application {
   // Routes
   app.use("/api/auth", authRoutes);
   app.use("/api/users", userRoutes);
+  app.use("/api/swipes", swipeRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/", adminRoutes);
+
+  app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
+    if (err instanceof multer.MulterError) {
+      const message =
+        err.code === "LIMIT_FILE_SIZE"
+          ? "Image must be 5MB or smaller"
+          : err.message;
+      res.status(400).json({ success: false, message });
+      return;
+    }
+
+    if (err instanceof Error && err.message === "Unsupported file type. Please upload a valid image.") {
+      res.status(400).json({ success: false, message: err.message });
+      return;
+    }
+
+    next(err);
+  });
 
   return app;
 }

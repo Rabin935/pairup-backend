@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 
 import { UserModel } from "../models/user.model";
+import { SwipeModel } from "../models/swipe.model";
 import { UserService } from "../services/user.service";
 import { CloudinaryService } from "../services/cloudinary.service";
 
@@ -97,8 +98,8 @@ export class UserController {
 			if (typeof interests !== "undefined") {
 				const parsedInterests = Array.isArray(interests)
 					? interests
-						.map((item) => item.toString().trim())
-						.filter(Boolean)
+							.map((item) => item.toString().trim())
+							.filter(Boolean)
 					: (interests as string)
 						.split(",")
 						.map((item) => item.trim())
@@ -109,8 +110,35 @@ export class UserController {
 			if (req.file) {
 				const previousPublicId = user.profileImagePublicId;
 				const uploaded = await CloudinaryService.uploadImage(req.file);
+
 				user.profileImage = uploaded.url;
 				user.profileImagePublicId = uploaded.publicId;
+
+				if (!Array.isArray(user.images)) {
+					user.images = [];
+				}
+
+				let thumbnailEntry = user.images.find((img) => img.isThumbnail) ?? user.images[0];
+
+				if (!thumbnailEntry) {
+					user.images.push({
+						url: uploaded.url,
+						public_id: uploaded.publicId,
+						isThumbnail: true,
+					});
+					thumbnailEntry = user.images[user.images.length - 1];
+				} else {
+					thumbnailEntry.url = uploaded.url;
+					thumbnailEntry.public_id = uploaded.publicId;
+					thumbnailEntry.isThumbnail = true;
+				}
+
+				user.images.forEach((img) => {
+					if (img !== thumbnailEntry) {
+						img.isThumbnail = false;
+					}
+				});
+
 				if (previousPublicId && previousPublicId !== uploaded.publicId) {
 					await CloudinaryService.deleteImage(previousPublicId);
 				}
@@ -207,7 +235,7 @@ export class UserController {
 		}
 	};
 
-	discoverUsers = async (req: Request, res: Response): Promise<void> => {
+		discoverUsers = async (req: Request, res: Response): Promise<void> => {
 		try {
 			const query = req.user?.id
 				? { uid: req.user.id }
@@ -220,32 +248,56 @@ export class UserController {
 				return;
 			}
 
-			const currentUser = await UserModel.findOne(query).select("_id swipes");
+			const currentUser = await UserModel.findOne(query).select("_id");
 			if (!currentUser) {
 				res.status(404).json({ success: false, message: "User not found" });
 				return;
 			}
 
-			const swipedIds = (currentUser.swipes || [])
-				.map((swipe) => swipe.user)
+			const swipeDocs = await SwipeModel.find({ swiper: currentUser._id })
+				.select("swipedUser")
+				.lean();
+			const swipedIds = swipeDocs
+				.map((doc) => doc.swipedUser)
 				.filter((id): id is typeof currentUser._id => Boolean(id));
 			const exclusionIds = [currentUser._id, ...swipedIds];
 
 			const discoverableUsers = await UserModel.find({
 				_id: { $nin: exclusionIds },
 				isProfileComplete: true,
-				"images.0": { $exists: true },
 			})
-				.select("_id firstname lastname age bio images")
+				.select("_id firstname lastname age bio images profileImage profileImagePublicId")
 				.lean();
 
-			const formattedUsers = discoverableUsers.map((user) => ({
-				_id: user._id,
-				name: [user.firstname, user.lastname].filter(Boolean).join(" ").trim(),
-				age: user.age ?? null,
-				bio: user.bio ?? "",
-				images: user.images || [],
-			}));
+			const formattedUsers = discoverableUsers.flatMap((user) => {
+				const gallery = Array.isArray(user.images) ? user.images.filter(Boolean) : [];
+				const normalizedImages =
+					gallery.length > 0
+						? gallery
+						: user.profileImage
+						? [
+						      {
+						          url: user.profileImage,
+						          public_id: user.profileImagePublicId || user.profileImage,
+						          isThumbnail: true,
+						      },
+					      ]
+						: [];
+
+				if (normalizedImages.length === 0) {
+					return [];
+				}
+
+				return [
+					{
+						_id: user._id,
+						name: [user.firstname, user.lastname].filter(Boolean).join(" ").trim(),
+						age: user.age ?? null,
+						bio: user.bio ?? "",
+						images: normalizedImages,
+					},
+				];
+			});
 
 			res.status(200).json({ success: true, data: formattedUsers });
 		} catch (error) {
@@ -362,4 +414,3 @@ export class UserController {
 		}
 	};
 }
-
