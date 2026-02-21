@@ -5,6 +5,8 @@ import type jwt from "jsonwebtoken";
 import { socketAuth } from "./middleware/socket-auth";
 import { MessageModel } from "./models/message.model";
 import { ConversationModel } from "./models/conversation.model";
+import { ConnectionModel } from "./models/connection.model";
+import { markOnline, markOffline } from "./services/presence.service";
 
 type AuthedSocket = Socket & { user?: jwt.JwtPayload | string };
 
@@ -32,8 +34,15 @@ export function initSocket(httpServer: HTTPServer) {
       return;
     }
 
-    socket.join(userId.toString());
-    console.log(`User ${userId} connected and joined room ${userId}`);
+    const userRoom = userId.toString();
+    socket.join(userRoom);
+    console.log(`User ${userRoom} connected and joined room ${userRoom}`);
+
+    if (markOnline(userRoom)) {
+      broadcastPresence(userRoom, "online").catch((err) =>
+        console.error("Failed to broadcast presence online", err)
+      );
+    }
 
     socket.on(
       "sendMessage",
@@ -87,7 +96,13 @@ export function initSocket(httpServer: HTTPServer) {
     );
 
     socket.on("disconnect", () => {
-      console.log(`User ${userId} disconnected`);
+      const wentOffline = markOffline(userRoom);
+      if (wentOffline) {
+        broadcastPresence(userRoom, "offline").catch((err) =>
+          console.error("Failed to broadcast presence offline", err)
+        );
+      }
+      console.log(`User ${userRoom} disconnected`);
     });
   });
 
@@ -99,4 +114,21 @@ export function getIO(): SocketIOServer {
     throw new Error("Socket.io not initialized");
   }
   return ioInstance;
+}
+
+async function broadcastPresence(userId: string, status: "online" | "offline") {
+  const io = getIO();
+  const connections = await ConnectionModel.find({
+    $or: [{ userA: userId }, { userB: userId }],
+  }).select("userA userB");
+
+  const peerIds = connections.map((conn) =>
+    conn.userA.toString() === userId ? conn.userB.toString() : conn.userA.toString()
+  );
+
+  peerIds.forEach((peerId) => {
+    io.to(peerId).emit("presence:update", { userId, status });
+  });
+
+  io.to(userId).emit("presence:update", { userId, status });
 }

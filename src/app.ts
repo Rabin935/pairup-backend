@@ -9,6 +9,8 @@ import userRoutes from "./routes/user.route";
 import adminRoutes from "./routes/admin/admin.route";
 import swipeRoutes from "./routes/swipe.route";
 import messageRoutes from "./routes/message.route";
+import inviteRoutes from "./routes/invite.route";
+import connectionRoutes from "./routes/connection.route";
 
 export function createApp(): Application {
   const app: Application = express();
@@ -36,6 +38,8 @@ export function createApp(): Application {
   app.use("/api/users", userRoutes);
   app.use("/api/swipes", swipeRoutes);
   app.use("/api/messages", messageRoutes);
+  app.use("/api/invites", inviteRoutes);
+  app.use("/api/connections", connectionRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/", adminRoutes);
 

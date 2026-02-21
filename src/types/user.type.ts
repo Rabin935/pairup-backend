@@ -17,6 +17,7 @@ export const UserSchema = z.object({
   bio: z.string().optional(),
   profileImage: z.string().default(""),
   profileImagePublicId: z.string().default(""),
+  image: z.string().default(""),
   images: z
     .array(
       z.object({
