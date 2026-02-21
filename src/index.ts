@@ -22,10 +22,19 @@ export const io = new SocketIOServer(httpServer, {
 io.use(socketAuth);
 
 io.on("connection", (socket) => {
-  console.log(`Socket connected: ${socket.id}`);
+  const userPayload = socket.user as { id?: string; _id?: string } | undefined;
+  const userId = userPayload?.id || userPayload?._id;
+
+  if (!userId) {
+    socket.disconnect(true);
+    return;
+  }
+
+  socket.join(userId.toString());
+  console.log(`User ${userId} connected and joined room ${userId}`);
 
   socket.on("disconnect", () => {
-    console.log(`Socket disconnected: ${socket.id}`);
+    console.log(`User ${userId} disconnected`);
   });
 });
 
