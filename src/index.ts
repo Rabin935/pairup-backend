@@ -4,6 +4,7 @@ import { Server as SocketIOServer } from "socket.io";
 import { createApp } from "./app";
 import { connectDB } from "./database/mongodb";
 import { PORT } from "./config";
+import { socketAuth } from "./middleware/socket-auth";
 
 dotenv.config();
 
@@ -17,6 +18,8 @@ export const io = new SocketIOServer(httpServer, {
     credentials: true,
   },
 });
+
+io.use(socketAuth);
 
 io.on("connection", (socket) => {
   console.log(`Socket connected: ${socket.id}`);
