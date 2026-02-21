@@ -3,17 +3,19 @@ import { UserType } from "../types/user.type";
 
 type UserImageType = UserType["images"][number];
 
-export interface IUserImage extends UserImageType {
+export interface IUserImage extends Omit<UserImageType, "likes"> {
   _id?: mongoose.Types.ObjectId;
+  likes: mongoose.Types.ObjectId[];
 }
 
-export interface IUser extends Omit<UserType, "images">, Document {
+export interface IUser extends Omit<UserType, "images" | "blockedUsers">, Document {
   _id: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
   resetPasswordToken?: string;
   resetPasswordExpire?: Date;
   images: IUserImage[];
+  blockedUsers: mongoose.Types.ObjectId[];
 }
 
 const UserSchema: Schema = new Schema(
@@ -66,6 +68,19 @@ const UserSchema: Schema = new Schema(
       type: String,
       enum: ["user", "admin"],
       default: "user",
+    },
+
+    isBanned: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
+    banReason: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 300,
     },
 
     // 🖼️ Profile image path (Multer)
@@ -131,6 +146,15 @@ const UserSchema: Schema = new Schema(
             type: Boolean,
             default: false,
           },
+          likes: {
+            type: [
+              {
+                type: Schema.Types.ObjectId,
+                ref: "User",
+              },
+            ],
+            default: [],
+          },
         },
       ],
       default: [],
@@ -139,6 +163,35 @@ const UserSchema: Schema = new Schema(
     isProfileComplete: {
       type: Boolean,
       default: false,
+    },
+    lastSeen: {
+      type: Date,
+      default: null,
+    },
+    onlineVisibility: {
+      type: Boolean,
+      default: true,
+    },
+    notificationPreferences: {
+      likes: { type: Boolean, default: true },
+      postLikes: { type: Boolean, default: true },
+      matches: { type: Boolean, default: true },
+      messages: { type: Boolean, default: true },
+    },
+    privacy: {
+      showAge: { type: Boolean, default: true },
+      showLocation: { type: Boolean, default: true },
+      showOnlineStatus: { type: Boolean, default: true },
+    },
+    blockedUsers: {
+      type: [
+        {
+          type: Schema.Types.ObjectId,
+          ref: "User",
+        },
+      ],
+      default: [],
+      index: true,
     },
     resetPasswordToken: {
       type: String,
@@ -152,8 +205,6 @@ const UserSchema: Schema = new Schema(
   {
     timestamps: true,
   }
-  
-
 );
 
 export const UserModel = mongoose.model<IUser>("User", UserSchema);
