@@ -4,6 +4,7 @@ export interface ILike extends Document {
   sender: mongoose.Types.ObjectId;
   receiver: mongoose.Types.ObjectId;
   status: "pending" | "accepted" | "declined";
+  seenAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,6 +25,11 @@ const LikeSchema: Schema<ILike> = new Schema<ILike>(
       type: String,
       enum: ["pending", "accepted", "declined"],
       default: "pending",
+    },
+    seenAt: {
+      type: Date,
+      default: null,
+      index: true,
     },
   },
   {
