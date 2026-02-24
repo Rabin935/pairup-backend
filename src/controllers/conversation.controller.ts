@@ -49,7 +49,7 @@ export class ConversationController {
       );
 
       const memberDocs = await UserModel.find({ _id: { $in: memberIds } })
-        .select("_id uid firstname lastname profileImage image images age location")
+        .select("_id uid firstname lastname profileImage image images age location lastSeen updatedAt onlineVisibility privacy")
         .lean();
 
       const memberMap = new Map(memberDocs.map((u) => [u._id.toString(), u]));
@@ -58,8 +58,10 @@ export class ConversationController {
         conversations.map(async (conv) => {
           const lastMessage = await MessageModel.findOne({ conversationId: conv._id })
             .sort({ createdAt: -1 })
-            .select("text sender createdAt")
+            .select("text imageUrl sender createdAt")
             .lean();
+          const lastMessageText =
+            (lastMessage?.text || "").trim() || (lastMessage?.imageUrl ? "Photo" : "");
 
           const unreadCount = await MessageModel.countDocuments({
             conversationId: conv._id,
@@ -72,6 +74,9 @@ export class ConversationController {
             .filter(Boolean)
             .map((user: any) => {
               const online = isOnline(user._id.toString());
+              const canShowOnline =
+                user.onlineVisibility !== false && user.privacy?.showOnlineStatus !== false;
+              const effectiveOnline = canShowOnline ? online : false;
               const avatar = pickAvatar(user);
               return {
                 id: user._id.toString(),
@@ -84,14 +89,15 @@ export class ConversationController {
                 location: user.location,
                 avatar,
                 profileImage: avatar,
-                isOnline: online,
-                status: online ? "online" : "offline",
+                isOnline: effectiveOnline,
+                status: effectiveOnline ? "online" : "offline",
+                lastSeen: canShowOnline ? user.lastSeen ?? user.updatedAt ?? null : null,
               };
             });
 
           return {
             id: conv._id.toString(),
-            lastMessage: lastMessage?.text || "",
+            lastMessage: lastMessageText || conv.lastMessage || "",
             lastMessageAt: lastMessage?.createdAt || conv.updatedAt,
             updatedAt: conv.updatedAt,
             unreadCount,
@@ -141,9 +147,14 @@ export class ConversationController {
         return;
       }
 
+      await MessageModel.updateMany(
+        { conversationId: id, receiver: currentUser._id, read: false },
+        { $set: { read: true } }
+      );
+
       const messages = await MessageModel.find({ conversationId: id })
         .sort({ createdAt: 1 })
-        .select("_id conversationId sender receiver text createdAt")
+        .select("_id conversationId sender receiver text imageUrl createdAt")
         .lean();
 
       const formatted = messages.map((msg) => ({
@@ -151,6 +162,7 @@ export class ConversationController {
         conversationId: msg.conversationId.toString(),
         senderId: msg.sender.toString(),
         body: msg.text,
+        imageUrl: msg.imageUrl || "",
         createdAt: msg.createdAt,
       }));
 
