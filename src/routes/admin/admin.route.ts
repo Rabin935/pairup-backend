@@ -19,8 +19,8 @@ const adminController = new AdminController();
 router.post("/login", (req, res) => adminController.adminLogin(req, res));
 
 // Admin routes (protected)
-router.get("/users", authorizedMiddleware, isAdmin, getUsers);
-router.get("/users/:id", authorizedMiddleware, isAdmin, getUserById);
+router.get("/users", authorizedMiddleware, getUsers);
+router.get("/users/:id", authorizedMiddleware, getUserById);
 router.post(
   "/users",
   authorizedMiddleware,

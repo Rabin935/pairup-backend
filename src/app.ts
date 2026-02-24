@@ -11,6 +11,7 @@ import swipeRoutes from "./routes/swipe.route";
 import messageRoutes from "./routes/message.route";
 import inviteRoutes from "./routes/invite.route";
 import connectionRoutes from "./routes/connection.route";
+import conversationRoutes from "./routes/conversation.route";
 
 export function createApp(): Application {
   const app: Application = express();
@@ -40,8 +41,9 @@ export function createApp(): Application {
   app.use("/api/messages", messageRoutes);
   app.use("/api/invites", inviteRoutes);
   app.use("/api/connections", connectionRoutes);
+  app.use("/api/conversations", conversationRoutes);
   app.use("/api/admin", adminRoutes);
-  app.use("/", adminRoutes);
+  app.use("/admin", adminRoutes);
 
   app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
     if (err instanceof multer.MulterError) {

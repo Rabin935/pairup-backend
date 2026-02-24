@@ -4,6 +4,7 @@ import { UserModel } from "../models/user.model";
 import { SwipeModel } from "../models/swipe.model";
 import { UserService } from "../services/user.service";
 import { CloudinaryService } from "../services/cloudinary.service";
+import { isOnline } from "../services/presence.service";
 
 export class UserController {
 	private userService: UserService;
@@ -226,12 +227,64 @@ export class UserController {
 		}
 	};
 
-	getAllUsers = async (_req: Request, res: Response): Promise<void> => {
+	getAllUsers = async (req: Request, res: Response): Promise<void> => {
 		try {
-			const users = UserService.getAllUsers();
-			res.json(users);
+			const actorId = req.user?.id || req.user?.mongoId || (req.user as any)?._id;
+			if (!actorId) {
+				res.status(401).json({ success: false, message: "Unauthorized" });
+				return;
+			}
+
+			const currentUser = await UserModel.findOne({ $or: [{ uid: actorId }, { _id: actorId }] }).select(
+				"_id uid"
+			);
+			if (!currentUser) {
+				res.status(404).json({ success: false, message: "User not found" });
+				return;
+			}
+
+			const excludeSelf = String(req.query.excludeSelf || "false").toLowerCase() === "true";
+
+			const users = await UserModel.find(
+				excludeSelf
+					? { _id: { $ne: currentUser._id }, role: { $ne: "admin" } }
+					: { role: { $ne: "admin" } }
+			)
+				.select(
+					"_id uid firstname lastname email profileImage image images age location bio interests isProfileComplete"
+				)
+				.lean();
+
+			const formatted = users.map((user) => {
+				const avatar =
+					user.profileImage ||
+					user.image ||
+					user.images?.find((img) => img?.isThumbnail)?.url ||
+					user.images?.[0]?.url ||
+					"";
+
+				return {
+					id: user._id.toString(),
+					uid: user.uid,
+					firstname: user.firstname,
+					lastname: user.lastname,
+					age: user.age,
+					location: user.location,
+					avatar,
+					bio: user.bio,
+					interests: user.interests,
+					isProfileComplete: user.isProfileComplete,
+					status: isOnline(user._id.toString()) ? "online" : "offline",
+				};
+			});
+
+			res.status(200).json({ success: true, users: formatted, data: formatted, count: formatted.length });
 		} catch (error) {
-			res.status(500).json({ message: (error as Error).message });
+			res.status(500).json({
+				success: false,
+				message: "Unable to load users",
+				error: (error as Error).message,
+			});
 		}
 	};
 
@@ -299,6 +352,7 @@ export class UserController {
 			const freshUsers = await UserModel.find({
 				_id: { $nin: exclusionIds },
 				isProfileComplete: true,
+				role: { $ne: "admin" },
 			})
 				.select("_id firstname lastname age bio images profileImage profileImagePublicId")
 				.lean();
@@ -306,6 +360,7 @@ export class UserController {
 			const previousUsers = includePrevious
 				? await UserModel.find({
 					_id: { $in: swipedIds },
+					role: { $ne: "admin" },
 				})
 						.select("_id firstname lastname age bio images profileImage profileImagePublicId")
 						.lean()
@@ -313,6 +368,7 @@ export class UserController {
 
 			const recycledUsers: typeof freshUsers = await UserModel.find({
 				_id: { $nin: [currentUser._id] },
+				role: { $ne: "admin" },
 			})
 				.select("_id firstname lastname age bio images profileImage profileImagePublicId")
 				.limit(50)

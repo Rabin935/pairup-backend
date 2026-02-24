@@ -8,6 +8,7 @@ declare global {
     interface Request {
       user?: {
         id: string;
+        mongoId?: string;
         role: string;
         [key: string]: any;
       };
@@ -48,6 +49,7 @@ export const authorizedMiddleware = async (
 
     req.user = {
       id: user.uid,
+      mongoId: user._id.toString(),
       role: user.role,
       email: user.email,
       firstname: user.firstname,

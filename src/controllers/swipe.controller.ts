@@ -7,6 +7,7 @@ import { ConnectionModel } from "../models/connection.model";
 import { checkRateLimit } from "../utils/rate-limit";
 import { getIO } from "../socket";
 import { sendEmail } from "../config/email";
+import { IUser } from "../models/user.model";
 
 export class SwipeController {
   createSwipe = async (req: Request, res: Response): Promise<void> => {
@@ -50,7 +51,9 @@ export class SwipeController {
         UserModel.findOne(actorQuery).select(
           "_id uid firstname lastname email profileImage profileImagePublicId image images age location"
         ),
-        UserModel.findById(swipedUserId).select("_id uid firstname lastname email profileImage image images age location"),
+        UserModel.findById(swipedUserId).select(
+          "_id uid firstname lastname email profileImage image images age location"
+        ),
       ]);
 
       if (!swiperUser) {
@@ -87,27 +90,6 @@ export class SwipeController {
         return;
       }
 
-      const pendingInvite = await InvitationModel.findOne({
-        fromUser: swiperUser._id,
-        toUser: swipedUser._id,
-        status: "pending",
-      });
-
-      if (pendingInvite) {
-        res.status(200).json({
-          success: true,
-          message: "Invitation already pending",
-          invitation: pendingInvite,
-        });
-        return;
-      }
-
-      const invitation = await InvitationModel.create({
-        fromUser: swiperUser._id,
-        toUser: swipedUser._id,
-        status: "pending",
-      });
-
       const preview = {
         name: `${swiperUser.firstname} ${swiperUser.lastname}`.trim(),
         avatar:
@@ -120,20 +102,32 @@ export class SwipeController {
         location: swiperUser.location,
       };
 
+      const pendingInvite = await InvitationModel.findOne({
+        fromUser: swiperUser._id,
+        toUser: swipedUser._id,
+        status: "pending",
+      });
+
+      if (pendingInvite) {
+        res.status(200).json({
+          success: true,
+          message: "Invitation already pending",
+          invitation: pendingInvite,
+        });
+
+        emitInviteNotifications(swiperUser, swipedUser, pendingInvite, preview);
+        return;
+      }
+
+      const invitation = await InvitationModel.create({
+        fromUser: swiperUser._id,
+        toUser: swipedUser._id,
+        status: "pending",
+      });
+
       res.status(201).json({ success: true, message: "Invitation created", invitation });
 
-      try {
-        const io = getIO();
-        io.to(swipedUser._id.toString()).emit("invite:created", {
-          invitationId: invitation._id.toString(),
-          fromUserId: swiperUser._id.toString(),
-          toUserId: swipedUser._id.toString(),
-          preview,
-          expiresAt: invitation.expiresAt,
-        });
-      } catch (notifyError) {
-        console.error("Failed to emit invite:created", notifyError);
-      }
+      emitInviteNotifications(swiperUser, swipedUser, invitation, preview);
 
       if (swipedUser.email) {
         const subject = "You have a new invite";
@@ -150,4 +144,52 @@ export class SwipeController {
       });
     }
   };
+}
+
+function emitInviteNotifications(
+  fromUser: IUser,
+  toUser: IUser,
+  invitation: { _id: mongoose.Types.ObjectId; expiresAt?: Date },
+  preview: {
+    name: string;
+    avatar: string;
+    age?: number;
+    location?: string;
+  }
+) {
+  try {
+    const io = getIO();
+    const toRoom = toUser._id.toString();
+    const toUidRoom = toUser.uid;
+    const fromId = fromUser._id.toString();
+
+    const rooms = [toRoom, toUidRoom].filter(Boolean) as string[];
+
+    rooms.forEach((room) => {
+      io.to(room).emit("invite:created", {
+        invitationId: invitation._id.toString(),
+        fromUserId: fromId,
+        toUserId: room,
+        preview,
+        expiresAt: invitation.expiresAt,
+      });
+
+      io.to(room).emit("matchRequest", {
+        fromUserId: fromId,
+        toUserId: room,
+        action: "like",
+        type: "invite",
+        invitationId: invitation._id.toString(),
+        preview,
+      });
+    });
+
+    console.log("invite emitted", {
+      invitationId: invitation._id.toString(),
+      rooms,
+      fromId,
+    });
+  } catch (notifyError) {
+    console.error("Failed to emit invite notification", notifyError);
+  }
 }

@@ -15,9 +15,20 @@ export class MessageController {
 
       const messages = await MessageModel.find({
         conversationId: new Types.ObjectId(conversationId),
-      }).sort({ createdAt: 1 });
+      })
+        .sort({ createdAt: 1 })
+        .select("_id conversationId sender receiver text createdAt")
+        .lean();
 
-      res.status(200).json({ success: true, data: messages });
+      const formatted = messages.map((msg) => ({
+        id: msg._id.toString(),
+        conversationId: msg.conversationId.toString(),
+        senderId: msg.sender.toString(),
+        body: msg.text,
+        createdAt: msg.createdAt,
+      }));
+
+      res.status(200).json({ success: true, messages: formatted });
     } catch (error) {
       console.error("Failed to fetch messages", error);
       res.status(500).json({ success: false, message: "Failed to fetch messages" });
@@ -49,7 +60,16 @@ export class MessageController {
       conversation.lastMessage = text;
       await conversation.save();
 
-      res.status(201).json({ success: true, data: message });
+      res.status(201).json({
+        success: true,
+        message: {
+          id: message._id.toString(),
+          conversationId: message.conversationId.toString(),
+          senderId: message.sender.toString(),
+          body: message.text,
+          createdAt: message.createdAt,
+        },
+      });
     } catch (error) {
       console.error("Failed to create message", error);
       res.status(500).json({ success: false, message: "Failed to create message" });

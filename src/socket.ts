@@ -7,6 +7,7 @@ import { MessageModel } from "./models/message.model";
 import { ConversationModel } from "./models/conversation.model";
 import { ConnectionModel } from "./models/connection.model";
 import { markOnline, markOffline } from "./services/presence.service";
+import { UserModel } from "./models/user.model";
 
 type AuthedSocket = Socket & { user?: jwt.JwtPayload | string };
 
@@ -25,7 +26,7 @@ export function initSocket(httpServer: HTTPServer) {
 
   io.use(socketAuth);
 
-  io.on("connection", (socket: AuthedSocket) => {
+  io.on("connection", async (socket: AuthedSocket) => {
     const userPayload = socket.user as { id?: string; _id?: string } | undefined;
     const userId = userPayload?.id || userPayload?._id;
 
@@ -36,7 +37,19 @@ export function initSocket(httpServer: HTTPServer) {
 
     const userRoom = userId.toString();
     socket.join(userRoom);
-    console.log(`User ${userRoom} connected and joined room ${userRoom}`);
+
+    try {
+      const userDoc = await UserModel.findById(userRoom).select("uid");
+      if (userDoc?.uid) {
+        socket.join(userDoc.uid);
+        console.log(`User ${userRoom} connected and joined rooms ${userRoom} and ${userDoc.uid}`);
+      } else {
+        console.log(`User ${userRoom} connected and joined room ${userRoom}`);
+      }
+    } catch (lookupErr) {
+      console.log(`User ${userRoom} connected and joined room ${userRoom}`);
+      console.error("Failed to look up uid for socket join", lookupErr);
+    }
 
     if (markOnline(userRoom)) {
       broadcastPresence(userRoom, "online").catch((err) =>

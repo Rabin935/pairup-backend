@@ -7,7 +7,7 @@ import { upload } from "../middleware/multer";
 const router = Router();
 const userController = new UserController();
 
-router.get("/", userController.getAllUsers);
+router.get("/", authorizedMiddleware, userController.getAllUsers);
 router.get("/discover", authorizedMiddleware, userController.discoverUsers);
 router.get("/me", authorizedMiddleware, userController.getCurrentUser);
 router.put(

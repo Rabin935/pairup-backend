@@ -12,6 +12,73 @@ const INVITE_ACTION_LIMIT = 40;
 const INVITE_WINDOW_MS = 60_000;
 
 export class InviteController {
+  listPending = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const actorUid = req.user?.id;
+      if (!actorUid) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const currentUser = await UserModel.findOne({ uid: actorUid }).select("_id uid");
+      if (!currentUser) {
+        res.status(404).json({ success: false, message: "User not found" });
+        return;
+      }
+
+      const invites = await InvitationModel.find({
+        toUser: currentUser._id,
+        status: "pending",
+      })
+        .populate("fromUser", "uid firstname lastname profileImage image images age location")
+        .sort({ createdAt: -1 })
+        .exec();
+
+      const formatted = invites.map((invite) => {
+        const fromUser = invite.fromUser as unknown as {
+          _id: mongoose.Types.ObjectId;
+          uid?: string;
+          firstname?: string;
+          lastname?: string;
+          profileImage?: string;
+          image?: string;
+          images?: { url?: string; isThumbnail?: boolean }[];
+          age?: number;
+          location?: string;
+        };
+
+        const avatar =
+          fromUser.profileImage ||
+          fromUser.image ||
+          fromUser.images?.find((img) => img.isThumbnail)?.url ||
+          fromUser.images?.[0]?.url ||
+          "";
+
+        return {
+          invitationId: invite._id.toString(),
+          fromUserId: fromUser._id.toString(),
+          status: invite.status,
+          createdAt: invite.createdAt,
+          expiresAt: invite.expiresAt,
+          preview: {
+            name: `${fromUser.firstname ?? ""} ${fromUser.lastname ?? ""}`.trim(),
+            avatar,
+            age: fromUser.age,
+            location: fromUser.location,
+          },
+        };
+      });
+
+      res.status(200).json({ success: true, invitations: formatted });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: "Unable to load invites",
+        error: (error as Error).message,
+      });
+    }
+  };
+
   acceptInvite = async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
