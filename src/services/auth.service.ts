@@ -1,3 +1,4 @@
+import type { Express } from "express";
 import { CreateUserDto, LoginUserDto } from "../dtos/user.dto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -5,6 +6,7 @@ import { HttpError } from "../error/http-error";
 import { JWT_SECRET } from "../config";
 import { UserRepository } from "../repositories/auth.repository";
 import { v4 as uuidv4 } from "uuid";
+import { CloudinaryService } from "./cloudinary.service";
 
 const userRepository = new UserRepository();
 
@@ -70,7 +72,7 @@ export class AuthService {
   /**
    * Update user profile
    */
-  async updateProfile(userId: string, data: any) {
+  async updateProfile(userId: string, data: any, file?: Express.Multer.File) {
     // Check if user exists
     const user = await userRepository.getUserById(userId);
     if (!user) {
@@ -82,8 +84,18 @@ export class AuthService {
       data.password = await bcrypt.hash(data.password, 10);
     }
 
+    const updates = { ...data } as Record<string, unknown>;
+
+    if (file) {
+      const uploaded = await CloudinaryService.uploadImage(file);
+      updates.image = uploaded.url;
+      updates.profileImage = uploaded.url;
+      updates.profileImagePublicId = uploaded.publicId;
+      await CloudinaryService.deleteImage(user.profileImagePublicId);
+    }
+
     // Update user in repository
-    const updatedUser = await userRepository.updateProfile(userId, data);
+    const updatedUser = await userRepository.updateProfile(userId, updates);
     return updatedUser;
   }
 }

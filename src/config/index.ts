@@ -13,3 +13,15 @@ export const JWT_SECRET: string =
 
 export const CLIENT_APP_URL: string =
     (process.env.CLIENT_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+
+export const CLOUDINARY_CLOUD_NAME: string =
+    process.env.CLOUDINARY_CLOUD_NAME || '';
+
+export const CLOUDINARY_API_KEY: string =
+    process.env.CLOUDINARY_API_KEY || '';
+
+export const CLOUDINARY_API_SECRET: string =
+    process.env.CLOUDINARY_API_SECRET || '';
+
+export const CLOUDINARY_FOLDER: string =
+    process.env.CLOUDINARY_FOLDER || 'pairup/profiles';
