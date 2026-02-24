@@ -15,16 +15,22 @@ function pickAvatar(user: any): string {
   );
 }
 
+const getActorMongoId = (req: Request): string | null => {
+  const actorId = req.user?._id || req.user?.mongoId;
+  if (!actorId || !mongoose.Types.ObjectId.isValid(actorId)) return null;
+  return actorId;
+};
+
 export class ConversationController {
   list = async (req: Request, res: Response): Promise<void> => {
     try {
-      const actorUid = req.user?.id;
-      if (!actorUid) {
+      const actorUserId = getActorMongoId(req);
+      if (!actorUserId) {
         res.status(401).json({ success: false, message: "Unauthorized" });
         return;
       }
 
-      const currentUser = await UserModel.findOne({ uid: actorUid }).select("_id uid firstname lastname");
+      const currentUser = await UserModel.findById(actorUserId).select("_id uid firstname lastname");
       if (!currentUser) {
         res.status(404).json({ success: false, message: "User not found" });
         return;
@@ -64,16 +70,24 @@ export class ConversationController {
           const participants = conv.members
             .map((memberId) => memberMap.get(memberId.toString()))
             .filter(Boolean)
-            .map((user: any) => ({
-              id: user._id.toString(),
-              uid: user.uid,
-              firstname: user.firstname,
-              lastname: user.lastname,
-              age: user.age,
-              location: user.location,
-              avatar: pickAvatar(user),
-              status: isOnline(user._id.toString()) ? "online" : "offline",
-            }));
+            .map((user: any) => {
+              const online = isOnline(user._id.toString());
+              const avatar = pickAvatar(user);
+              return {
+                id: user._id.toString(),
+                _id: user._id.toString(),
+                uid: user.uid,
+                firstname: user.firstname,
+                lastname: user.lastname,
+                name: `${user.firstname ?? ""} ${user.lastname ?? ""}`.trim() || "PairUp user",
+                age: user.age,
+                location: user.location,
+                avatar,
+                profileImage: avatar,
+                isOnline: online,
+                status: online ? "online" : "offline",
+              };
+            });
 
           return {
             id: conv._id.toString(),
@@ -85,6 +99,11 @@ export class ConversationController {
           };
         })
       );
+
+      console.log("[conversations.list]", {
+        currentUserId: currentUser._id.toString(),
+        conversationCount: conversations.length,
+      });
 
       res.status(200).json({ success: true, conversations: results });
     } catch (error) {
@@ -104,13 +123,13 @@ export class ConversationController {
         return;
       }
 
-      const actorUid = req.user?.id;
-      if (!actorUid) {
+      const actorUserId = getActorMongoId(req);
+      if (!actorUserId) {
         res.status(401).json({ success: false, message: "Unauthorized" });
         return;
       }
 
-      const currentUser = await UserModel.findOne({ uid: actorUid }).select("_id");
+      const currentUser = await UserModel.findById(actorUserId).select("_id");
       if (!currentUser) {
         res.status(404).json({ success: false, message: "User not found" });
         return;
@@ -147,8 +166,8 @@ export class ConversationController {
 
   start = async (req: Request, res: Response): Promise<void> => {
     try {
-      const actorUid = req.user?.id;
-      if (!actorUid) {
+      const actorUserId = getActorMongoId(req);
+      if (!actorUserId) {
         res.status(401).json({ success: false, message: "Unauthorized" });
         return;
       }
@@ -160,12 +179,17 @@ export class ConversationController {
       }
 
       const [currentUser, otherUser] = await Promise.all([
-        UserModel.findOne({ uid: actorUid }).select("_id"),
+        UserModel.findById(actorUserId).select("_id"),
         UserModel.findById(participantId).select("_id"),
       ]);
 
       if (!currentUser || !otherUser) {
         res.status(404).json({ success: false, message: "User not found" });
+        return;
+      }
+
+      if (currentUser._id.equals(otherUser._id)) {
+        res.status(400).json({ success: false, message: "Cannot start conversation with yourself" });
         return;
       }
 

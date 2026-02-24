@@ -16,7 +16,11 @@ let ioInstance: SocketIOServer | null = null;
 export function initSocket(httpServer: HTTPServer) {
   const io = new SocketIOServer(httpServer, {
     cors: {
-      origin: "http://localhost:3000",
+      origin: [
+        "http://10.0.2.2:3000",
+        "http://localhost:3000",
+        "http://localhost:3001",
+      ],
       methods: ["GET", "POST", "PUT", "DELETE"],
       credentials: true,
     },
@@ -60,14 +64,19 @@ export function initSocket(httpServer: HTTPServer) {
     socket.on(
       "sendMessage",
       async (
-        payload: { senderId?: string; receiverId?: string; text?: string },
+        payload: { senderId?: string; receiverId?: string; text?: string; clientMessageId?: string },
         callback?: (response: unknown) => void
       ) => {
-        const { senderId, receiverId, text } = payload;
+        const { senderId, receiverId, text, clientMessageId } = payload;
         const authUserId = userId.toString();
 
         if (!senderId || !receiverId || !text) {
           callback?.({ success: false, message: "Missing required fields" });
+          return;
+        }
+
+        if (!Types.ObjectId.isValid(senderId) || !Types.ObjectId.isValid(receiverId)) {
+          callback?.({ success: false, message: "Invalid sender or receiver id" });
           return;
         }
 
@@ -86,7 +95,23 @@ export function initSocket(httpServer: HTTPServer) {
           });
 
           if (!conversation) {
-            conversation = await ConversationModel.create({ members: memberIds });
+            try {
+              conversation = await ConversationModel.create({ members: memberIds });
+            } catch (conversationError) {
+              if ((conversationError as { code?: number }).code === 11000) {
+                conversation = await ConversationModel.findOne({
+                  "members.0": memberIds[0],
+                  "members.1": memberIds[1],
+                });
+              } else {
+                throw conversationError;
+              }
+            }
+          }
+
+          if (!conversation) {
+            callback?.({ success: false, message: "Unable to open conversation" });
+            return;
           }
 
           const message = await MessageModel.create({
@@ -99,8 +124,19 @@ export function initSocket(httpServer: HTTPServer) {
           conversation.lastMessage = text;
           await conversation.save();
 
-          io.to(receiverId.toString()).emit("receiveMessage", message);
-          callback?.({ success: true, message });
+          const messagePayload = {
+            id: message._id.toString(),
+            conversationId: conversation._id.toString(),
+            senderId: senderId.toString(),
+            receiverId: receiverId.toString(),
+            text: message.text,
+            createdAt: message.createdAt,
+            clientMessageId,
+          };
+
+          io.to(receiverId.toString()).emit("receiveMessage", messagePayload);
+          io.to(senderId.toString()).emit("receiveMessage", messagePayload);
+          callback?.({ success: true, message: messagePayload });
         } catch (error) {
           console.error("Failed to send message", error);
           callback?.({ success: false, message: "Failed to send message" });

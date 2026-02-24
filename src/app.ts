@@ -12,6 +12,8 @@ import messageRoutes from "./routes/message.route";
 import inviteRoutes from "./routes/invite.route";
 import connectionRoutes from "./routes/connection.route";
 import conversationRoutes from "./routes/conversation.route";
+import likeRoutes from "./routes/like.route";
+import matchRoutes from "./routes/match.route";
 
 export function createApp(): Application {
   const app: Application = express();
@@ -42,6 +44,8 @@ export function createApp(): Application {
   app.use("/api/invites", inviteRoutes);
   app.use("/api/connections", connectionRoutes);
   app.use("/api/conversations", conversationRoutes);
+  app.use("/api/likes", likeRoutes);
+  app.use("/api/matches", matchRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/admin", adminRoutes);
 

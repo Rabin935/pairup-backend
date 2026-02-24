@@ -4,12 +4,82 @@ import { Request, Response } from "express";
 import { UserModel } from "../models/user.model";
 import { InvitationModel } from "../models/invitation.model";
 import { ConnectionModel } from "../models/connection.model";
+import { LikeModel } from "../models/like.model";
 import { checkRateLimit } from "../utils/rate-limit";
 import { getIO } from "../socket";
 import { sendEmail } from "../config/email";
 import { IUser } from "../models/user.model";
 
 export class SwipeController {
+  swipeRight = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const senderId = req.user?.mongoId;
+      if (!senderId || !mongoose.Types.ObjectId.isValid(senderId)) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const { receiverId } = req.body as { receiverId?: string };
+      if (!receiverId || !mongoose.Types.ObjectId.isValid(receiverId)) {
+        res.status(400).json({ success: false, message: "Valid receiverId is required" });
+        return;
+      }
+
+      if (senderId === receiverId) {
+        res.status(400).json({ success: false, message: "You cannot like yourself" });
+        return;
+      }
+
+      const [senderUser, receiverUser] = await Promise.all([
+        UserModel.findById(senderId).select("_id"),
+        UserModel.findById(receiverId).select("_id"),
+      ]);
+
+      if (!senderUser) {
+        res.status(404).json({ success: false, message: "Current user not found" });
+        return;
+      }
+
+      if (!receiverUser) {
+        res.status(404).json({ success: false, message: "Receiver not found" });
+        return;
+      }
+
+      const existingLike = await LikeModel.findOne({
+        sender: senderUser._id,
+        receiver: receiverUser._id,
+      }).select("_id");
+
+      if (existingLike) {
+        res.status(409).json({ success: false, message: "You already liked this user" });
+        return;
+      }
+
+      const like = await LikeModel.create({
+        sender: senderUser._id,
+        receiver: receiverUser._id,
+        status: "pending",
+      });
+
+      res.status(201).json({
+        success: true,
+        message: "Right swipe recorded successfully",
+        like,
+      });
+    } catch (error) {
+      if ((error as { code?: number }).code === 11000) {
+        res.status(409).json({ success: false, message: "You already liked this user" });
+        return;
+      }
+
+      res.status(500).json({
+        success: false,
+        message: "Unable to process right swipe",
+        error: (error as Error).message,
+      });
+    }
+  };
+
   createSwipe = async (req: Request, res: Response): Promise<void> => {
     try {
       const { swipedUserId, action } = req.body as {
@@ -162,6 +232,7 @@ function emitInviteNotifications(
     const toRoom = toUser._id.toString();
     const toUidRoom = toUser.uid;
     const fromId = fromUser._id.toString();
+    const toUserId = toUser._id.toString();
 
     const rooms = [toRoom, toUidRoom].filter(Boolean) as string[];
 
@@ -169,14 +240,16 @@ function emitInviteNotifications(
       io.to(room).emit("invite:created", {
         invitationId: invitation._id.toString(),
         fromUserId: fromId,
-        toUserId: room,
+        toUserId,
+        recipientRoom: room,
         preview,
         expiresAt: invitation.expiresAt,
       });
 
       io.to(room).emit("matchRequest", {
         fromUserId: fromId,
-        toUserId: room,
+        toUserId,
+        recipientRoom: room,
         action: "like",
         type: "invite",
         invitationId: invitation._id.toString(),

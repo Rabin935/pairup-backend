@@ -3,6 +3,8 @@ import { Request, Response } from "express";
 
 import { InvitationModel } from "../models/invitation.model";
 import { ConnectionModel } from "../models/connection.model";
+import { MatchModel } from "../models/match.model";
+import { ConversationModel } from "../models/conversation.model";
 import { UserModel } from "../models/user.model";
 import { checkRateLimit } from "../utils/rate-limit";
 import { getIO } from "../socket";
@@ -11,16 +13,22 @@ import { isOnline } from "../services/presence.service";
 const INVITE_ACTION_LIMIT = 40;
 const INVITE_WINDOW_MS = 60_000;
 
+const getActorMongoId = (req: Request): string | null => {
+  const actorId = req.user?._id || req.user?.mongoId;
+  if (!actorId || !mongoose.Types.ObjectId.isValid(actorId)) return null;
+  return actorId;
+};
+
 export class InviteController {
   listPending = async (req: Request, res: Response): Promise<void> => {
     try {
-      const actorUid = req.user?.id;
-      if (!actorUid) {
+      const actorUserId = getActorMongoId(req);
+      if (!actorUserId) {
         res.status(401).json({ success: false, message: "Unauthorized" });
         return;
       }
 
-      const currentUser = await UserModel.findOne({ uid: actorUid }).select("_id uid");
+      const currentUser = await UserModel.findById(actorUserId).select("_id uid");
       if (!currentUser) {
         res.status(404).json({ success: false, message: "User not found" });
         return;
@@ -87,19 +95,19 @@ export class InviteController {
         return;
       }
 
-      const actorUid = req.user?.id;
-      if (!actorUid) {
+      const actorUserId = getActorMongoId(req);
+      if (!actorUserId) {
         res.status(401).json({ success: false, message: "Unauthorized" });
         return;
       }
 
-      const rate = checkRateLimit(`invite-action:${actorUid}`, INVITE_ACTION_LIMIT, INVITE_WINDOW_MS);
+      const rate = checkRateLimit(`invite-action:${actorUserId}`, INVITE_ACTION_LIMIT, INVITE_WINDOW_MS);
       if (!rate.allowed) {
         res.status(429).json({ success: false, message: "Too many actions. Please slow down." });
         return;
       }
 
-      const currentUser = await UserModel.findOne({ uid: actorUid }).select("_id uid firstname lastname");
+      const currentUser = await UserModel.findById(actorUserId).select("_id uid firstname lastname");
       if (!currentUser) {
         res.status(404).json({ success: false, message: "User not found" });
         return;
@@ -131,25 +139,95 @@ export class InviteController {
       const ensuredConnection =
         existingConnection || (await ConnectionModel.create({ userA: participants[0], userB: participants[1] }));
 
-      res.status(200).json({ success: true, invitation, connection: ensuredConnection });
+      let ensuredMatch = await MatchModel.findOne({
+        "users.0": participants[0],
+        "users.1": participants[1],
+      });
+
+      if (!ensuredMatch) {
+        try {
+          ensuredMatch = await MatchModel.create({ users: [participants[0], participants[1]] });
+        } catch (matchError) {
+          if ((matchError as { code?: number }).code === 11000) {
+            ensuredMatch = await MatchModel.findOne({
+              "users.0": participants[0],
+              "users.1": participants[1],
+            });
+          } else {
+            throw matchError;
+          }
+        }
+      }
+
+      let conversationId: string | null = (
+        await ConversationModel.findOne({
+          "members.0": participants[0],
+          "members.1": participants[1],
+        })
+          .select("_id")
+          .lean()
+      )?._id?.toString() ?? null;
+
+      if (!conversationId) {
+        try {
+          const createdConversation = await ConversationModel.create({
+            members: [participants[0], participants[1]],
+          });
+          conversationId = createdConversation._id.toString();
+        } catch (conversationError) {
+          if ((conversationError as { code?: number }).code === 11000) {
+            conversationId = (
+              await ConversationModel.findOne({
+                "members.0": participants[0],
+                "members.1": participants[1],
+              })
+                .select("_id")
+                .lean()
+            )?._id?.toString() ?? null;
+          } else {
+            throw conversationError;
+          }
+        }
+      }
+
+      res.status(200).json({
+        success: true,
+        invitation,
+        connection: ensuredConnection,
+        match: ensuredMatch,
+        matchId: ensuredMatch?._id?.toString() ?? null,
+        conversationId,
+      });
 
       try {
         const io = getIO();
-        const fromId = invitation.fromUser.toString();
-        const toId = invitation.toUser.toString();
-
-        io.to(fromId).emit("invite:accepted", {
+        const senderId = invitation.fromUser.toString();
+        const receiverId = invitation.toUser.toString();
+        const acceptedPayload = {
           invitationId: invitation._id.toString(),
-          fromUserId: fromId,
-          toUserId: toId,
+          senderId,
+          receiverId,
           connectionId: ensuredConnection._id.toString(),
+          matchId: ensuredMatch?._id?.toString() ?? null,
+          conversationId,
+        };
+
+        io.to(senderId).emit("invite:accepted", acceptedPayload);
+        io.to(receiverId).emit("invite:accepted", acceptedPayload);
+
+        io.to(senderId).emit("chat:match:created", acceptedPayload);
+        io.to(receiverId).emit("chat:match:created", acceptedPayload);
+
+        console.log("[invite.accept] emitted chat match created", {
+          rooms: [senderId, receiverId],
+          payload: acceptedPayload,
         });
 
-        const fromStatus = isOnline(fromId) ? "online" : "offline";
-        const toStatus = isOnline(toId) ? "online" : "offline";
+        const fromStatus = isOnline(senderId) ? "online" : "offline";
+        const toStatus = isOnline(receiverId) ? "online" : "offline";
 
-        io.to(fromId).emit("presence:update", { userId: toId, status: toStatus });
-        io.to(toId).emit("presence:update", { userId: fromId, status: fromStatus });
+        io.to(senderId).emit("presence:update", { userId: receiverId, status: toStatus });
+        io.to(receiverId).emit("presence:update", { userId: senderId, status: fromStatus });
       } catch (notifyError) {
         console.error("Failed to emit accept notifications", notifyError);
       }
@@ -170,19 +248,19 @@ export class InviteController {
         return;
       }
 
-      const actorUid = req.user?.id;
-      if (!actorUid) {
+      const actorUserId = getActorMongoId(req);
+      if (!actorUserId) {
         res.status(401).json({ success: false, message: "Unauthorized" });
         return;
       }
 
-      const rate = checkRateLimit(`invite-action:${actorUid}`, INVITE_ACTION_LIMIT, INVITE_WINDOW_MS);
+      const rate = checkRateLimit(`invite-action:${actorUserId}`, INVITE_ACTION_LIMIT, INVITE_WINDOW_MS);
       if (!rate.allowed) {
         res.status(429).json({ success: false, message: "Too many actions. Please slow down." });
         return;
       }
 
-      const currentUser = await UserModel.findOne({ uid: actorUid }).select("_id uid firstname lastname");
+      const currentUser = await UserModel.findById(actorUserId).select("_id uid firstname lastname");
       if (!currentUser) {
         res.status(404).json({ success: false, message: "User not found" });
         return;
