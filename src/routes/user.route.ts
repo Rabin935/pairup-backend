@@ -9,6 +9,7 @@ const userController = new UserController();
 
 router.get("/", authorizedMiddleware, userController.getAllUsers);
 router.get("/discover", authorizedMiddleware, userController.discoverUsers);
+router.get("/me/stats", authorizedMiddleware, userController.getCurrentUserStats);
 router.get("/me", authorizedMiddleware, userController.getCurrentUser);
 router.put(
 	"/update-profile",

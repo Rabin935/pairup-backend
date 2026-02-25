@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 
 import { UserModel } from "../models/user.model";
 import { SwipeModel } from "../models/swipe.model";
+import { LikeModel } from "../models/like.model";
+import { MatchModel } from "../models/match.model";
 import { UserService } from "../services/user.service";
 import { CloudinaryService } from "../services/cloudinary.service";
 import { isOnline } from "../services/presence.service";
@@ -37,6 +39,52 @@ export class UserController {
 			res.status(500).json({
 				success: false,
 				message: "Unable to retrieve profile",
+				error: (error as Error).message,
+			});
+		}
+	};
+
+	getCurrentUserStats = async (req: Request, res: Response): Promise<void> => {
+		try {
+			const query = req.user?.id
+				? { uid: req.user.id }
+				: req.user?.email
+				? { email: req.user.email }
+				: null;
+
+			if (!query) {
+				res.status(401).json({ success: false, message: "Unauthorized" });
+				return;
+			}
+
+			const user = await UserModel.findOne(query).select("_id");
+			if (!user) {
+				res.status(404).json({ success: false, message: "User not found" });
+				return;
+			}
+
+			const [viewerIds, likesReceived, matchesCount] = await Promise.all([
+				SwipeModel.distinct("swiper", { swipedUser: user._id }),
+				LikeModel.countDocuments({
+					receiver: user._id,
+					status: { $ne: "declined" },
+				}),
+				MatchModel.countDocuments({ users: { $in: [user._id] } }),
+			]);
+
+			res.status(200).json({
+				success: true,
+				data: {
+					views: viewerIds.length,
+					likes: likesReceived,
+					matches: matchesCount,
+					updatedAt: new Date().toISOString(),
+				},
+			});
+		} catch (error) {
+			res.status(500).json({
+				success: false,
+				message: "Unable to retrieve profile stats",
 				error: (error as Error).message,
 			});
 		}
@@ -307,8 +355,8 @@ export class UserController {
 				return;
 			}
 
-			const includePreviousParam = String(req.query.includePrevious || "true").toLowerCase();
-			const includePrevious = includePreviousParam !== "false";
+			const includePreviousParam = String(req.query.includePrevious || "false").toLowerCase();
+			const includePrevious = includePreviousParam === "true";
 
 			const swipeDocs = await SwipeModel.find({ swiper: currentUser._id })
 				.select("swipedUser")
@@ -367,7 +415,8 @@ export class UserController {
 				: [];
 
 			const recycledUsers: typeof freshUsers = await UserModel.find({
-				_id: { $nin: [currentUser._id] },
+				_id: { $nin: exclusionIds },
+				isProfileComplete: true,
 				role: { $ne: "admin" },
 			})
 				.select("_id firstname lastname age bio images profileImage profileImagePublicId")

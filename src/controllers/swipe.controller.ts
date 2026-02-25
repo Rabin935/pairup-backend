@@ -5,6 +5,7 @@ import { UserModel } from "../models/user.model";
 import { InvitationModel } from "../models/invitation.model";
 import { ConnectionModel } from "../models/connection.model";
 import { LikeModel } from "../models/like.model";
+import { SwipeModel } from "../models/swipe.model";
 import { checkRateLimit } from "../utils/rate-limit";
 import { getIO } from "../socket";
 import { sendEmail } from "../config/email";
@@ -44,6 +45,12 @@ export class SwipeController {
         res.status(404).json({ success: false, message: "Receiver not found" });
         return;
       }
+
+      await SwipeModel.findOneAndUpdate(
+        { swiper: senderUser._id, swipedUser: receiverUser._id },
+        { $set: { action: "like" } },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
 
       const existingLike = await LikeModel.findOne({
         sender: senderUser._id,
@@ -140,6 +147,12 @@ export class SwipeController {
         res.status(400).json({ success: false, message: "You cannot swipe on yourself" });
         return;
       }
+
+      await SwipeModel.findOneAndUpdate(
+        { swiper: swiperUser._id, swipedUser: swipedUser._id },
+        { $set: { action } },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
 
       if (action === "dislike") {
         res.status(200).json({ success: true, message: "Swipe left ignored" });
