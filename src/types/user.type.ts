@@ -11,6 +11,7 @@ export const UserSchema = z.object({
   role: z.enum(["admin", "user"]).default("user"),
   password: z.string().min(6, { error: "Password must be at least 6 char long" }),
   gender: z.enum(["male", "female", "other"]).optional(),
+  interestedIn: z.enum(["male", "female"]).optional(),
   age: z.number().int().positive().optional(),
   location: z.string().optional(),
   interests: z.array(z.string()).default([]),
