@@ -109,7 +109,7 @@ export class UserController {
 				return;
 			}
 
-			const { gender, age, location, interests, bio } = req.body;
+			const { gender, interestedIn, age, location, interests, bio } = req.body;
 
 			if (typeof gender === "string" && gender.trim()) {
 				const normalizedGender = gender.trim().toLowerCase();
@@ -122,6 +122,19 @@ export class UserController {
 					return;
 				}
 				user.gender = normalizedGender as typeof user.gender;
+			}
+
+			if (typeof interestedIn === "string" && interestedIn.trim()) {
+				const normalizedInterestedIn = interestedIn.trim().toLowerCase();
+				const allowedInterestedIn = ["male", "female"];
+				if (!allowedInterestedIn.includes(normalizedInterestedIn)) {
+					res.status(400).json({
+						success: false,
+						message: "Invalid interestedIn value",
+					});
+					return;
+				}
+				user.interestedIn = normalizedInterestedIn as typeof user.interestedIn;
 			}
 
 			if (typeof age !== "undefined") {
@@ -193,7 +206,7 @@ export class UserController {
 				}
 			}
 
-			user.isProfileComplete = Boolean(user.gender && user.age && user.location);
+			user.isProfileComplete = Boolean(user.gender && user.interestedIn && user.age && user.location);
 
 			await user.save();
 
@@ -349,9 +362,18 @@ export class UserController {
 				return;
 			}
 
-			const currentUser = await UserModel.findOne(query).select("_id");
+			const currentUser = await UserModel.findOne(query).select("_id gender interestedIn isProfileComplete");
 			if (!currentUser) {
 				res.status(404).json({ success: false, message: "User not found" });
+				return;
+			}
+
+			if (!currentUser.isProfileComplete || !currentUser.interestedIn) {
+				res.status(403).json({
+					success: false,
+					code: "PROFILE_INCOMPLETE",
+					message: "Complete your profile and choose who you are interested in to access Discover.",
+				});
 				return;
 			}
 
@@ -392,6 +414,9 @@ export class UserController {
 							name: [user.firstname, user.lastname].filter(Boolean).join(" ").trim(),
 							age: user.age ?? null,
 							bio: user.bio ?? "",
+							location: user.location ?? "",
+							interests: Array.isArray(user.interests) ? user.interests : [],
+							gender: user.gender ?? "",
 							images: normalizedImages,
 						},
 					];
@@ -400,26 +425,29 @@ export class UserController {
 			const freshUsers = await UserModel.find({
 				_id: { $nin: exclusionIds },
 				isProfileComplete: true,
+				gender: currentUser.interestedIn,
 				role: { $ne: "admin" },
 			})
-				.select("_id firstname lastname age bio images profileImage profileImagePublicId")
+				.select("_id firstname lastname age bio location interests gender images profileImage profileImagePublicId")
 				.lean();
 
 			const previousUsers = includePrevious
 				? await UserModel.find({
 					_id: { $in: swipedIds },
+					gender: currentUser.interestedIn,
 					role: { $ne: "admin" },
 				})
-						.select("_id firstname lastname age bio images profileImage profileImagePublicId")
+						.select("_id firstname lastname age bio location interests gender images profileImage profileImagePublicId")
 						.lean()
 				: [];
 
 			const recycledUsers: typeof freshUsers = await UserModel.find({
 				_id: { $nin: exclusionIds },
 				isProfileComplete: true,
+				gender: currentUser.interestedIn,
 				role: { $ne: "admin" },
 			})
-				.select("_id firstname lastname age bio images profileImage profileImagePublicId")
+				.select("_id firstname lastname age bio location interests gender images profileImage profileImagePublicId")
 				.limit(50)
 				.lean();
 

@@ -79,6 +79,11 @@ const UserSchema: Schema = new Schema(
       enum: ["male", "female", "other"],
     },
 
+    interestedIn: {
+      type: String,
+      enum: ["male", "female"],
+    },
+
     age: {
       type: Number,
     },
