@@ -23,7 +23,6 @@ const ConversationSchema: Schema = new Schema(
           new Set(value.map((memberId) => memberId.toString())).size === 2,
         message: "Conversation must have exactly two distinct members",
       },
-      index: true,
       required: true,
     },
     lastMessage: {
