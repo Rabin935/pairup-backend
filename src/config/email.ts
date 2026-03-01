@@ -4,7 +4,7 @@ const EMAIL_USER = process.env.EMAIL_USER || "";
 const EMAIL_PASS = process.env.EMAIL_PASS || "";
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || EMAIL_USER || "support@pairup.app";
 
-if (!EMAIL_USER || !EMAIL_PASS) {
+if (process.env.NODE_ENV !== "test" && (!EMAIL_USER || !EMAIL_PASS)) {
   console.warn("Warning: EMAIL_USER or EMAIL_PASS environment variables are not configured");
 }
 

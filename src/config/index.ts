@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 
-dotenv.config();
+dotenv.config({ quiet: process.env.NODE_ENV === "test" });
 
 export const PORT: number = 
 process.env.PORT ? parseInt(process.env.PORT): 3000;
