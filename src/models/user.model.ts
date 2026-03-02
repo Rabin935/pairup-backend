@@ -2,10 +2,16 @@ import mongoose, { Document, Schema } from "mongoose";
 import { UserType } from "../types/user.type";
 
 type UserImageType = UserType["images"][number];
+type UserImageLikeEntry =
+  | mongoose.Types.ObjectId
+  | {
+      user: mongoose.Types.ObjectId;
+      createdAt?: Date;
+    };
 
 export interface IUserImage extends Omit<UserImageType, "likes"> {
   _id?: mongoose.Types.ObjectId;
-  likes: mongoose.Types.ObjectId[];
+  likes: UserImageLikeEntry[];
 }
 
 export interface IUser extends Omit<UserType, "images" | "blockedUsers">, Document {
@@ -147,12 +153,8 @@ const UserSchema: Schema = new Schema(
             default: false,
           },
           likes: {
-            type: [
-              {
-                type: Schema.Types.ObjectId,
-                ref: "User",
-              },
-            ],
+            // Supports legacy ObjectId[] and new entries with like timestamp.
+            type: [Schema.Types.Mixed],
             default: [],
           },
         },

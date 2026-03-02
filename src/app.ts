@@ -3,6 +3,7 @@ import cors from "cors";
 import bodyParser from "body-parser";
 import path from "path";
 import multer from "multer";
+import { LAN_IP } from "./config";
 
 import authRoutes from "./routes/auth.routes";
 import userRoutes from "./routes/user.route";
@@ -22,6 +23,7 @@ export function createApp(): Application {
     cors({
       origin: [
         "http://10.0.2.2:3000", // Android Emulator
+        `http://${LAN_IP}:3000`, // Physical device / LAN
         "http://localhost:3001",
         "http://localhost:3000", // Flutter web
         "*", // Allow all (dev only)

@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import { createServer } from "http";
 import { createApp } from "./app";
 import { connectDB } from "./database/mongodb";
-import { PORT } from "./config";
+import { HOST, LAN_IP, PORT } from "./config";
 import { initSocket } from "./socket";
 
 dotenv.config();
@@ -25,12 +25,13 @@ async function startServer() {
         const onListening = () => {
           httpServer.removeListener("error", onError);
           console.log(`Server running at http://localhost:${port}`);
+          console.log(`LAN access at http://${LAN_IP}:${port}`);
           resolve();
         };
 
         httpServer.once("error", onError);
         httpServer.once("listening", onListening);
-        httpServer.listen(port);
+        httpServer.listen(port, HOST);
       });
 
     const startPort = Number(PORT) || 5000;

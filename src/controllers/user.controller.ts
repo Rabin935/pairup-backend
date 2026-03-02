@@ -7,6 +7,7 @@ import { SwipeModel } from "../models/swipe.model";
 import { MatchModel } from "../models/match.model";
 import { ConnectionModel } from "../models/connection.model";
 import { ReportModel } from "../models/report.model";
+import { ProfileViewModel } from "../models/profile-view.model";
 import { UserService } from "../services/user.service";
 import { CloudinaryService } from "../services/cloudinary.service";
 import { isOnline } from "../services/presence.service";
@@ -29,6 +30,97 @@ export class UserController {
 		}
 		return null;
 	};
+
+	private parseDate(value: unknown): Date | undefined {
+		if (value instanceof Date && !Number.isNaN(value.getTime())) {
+			return value;
+		}
+
+		if (typeof value === "string" && value.trim().length > 0) {
+			const parsed = new Date(value.trim());
+			if (!Number.isNaN(parsed.getTime())) {
+				return parsed;
+			}
+			return undefined;
+		}
+
+		if (typeof value === "number" && Number.isFinite(value)) {
+			const epoch = value > 9999999999 ? value : value * 1000;
+			const parsed = new Date(epoch);
+			if (!Number.isNaN(parsed.getTime())) {
+				return parsed;
+			}
+		}
+
+		return undefined;
+	}
+
+	private normalizeImageLikes(
+		rawLikes: unknown
+	): Array<{ userId: string; createdAt?: Date }> {
+		if (!Array.isArray(rawLikes)) {
+			return [];
+		}
+
+		const deduped = new Map<string, Date | undefined>();
+
+		for (const entry of rawLikes) {
+			let userId = "";
+			let createdAt: Date | undefined;
+
+			if (entry instanceof mongoose.Types.ObjectId) {
+				userId = entry.toString();
+			} else if (typeof entry === "string") {
+				userId = entry.trim();
+			} else if (entry && typeof entry === "object") {
+				const row = entry as Record<string, unknown>;
+				const rawUser = row.user ?? row.userId ?? row.likerId ?? row.id;
+
+				if (rawUser instanceof mongoose.Types.ObjectId) {
+					userId = rawUser.toString();
+				} else if (typeof rawUser === "string") {
+					userId = rawUser.trim();
+				}
+
+				createdAt = this.parseDate(
+					row.createdAt ?? row.timestamp ?? row.time ?? row.date
+				);
+			}
+
+			if (!userId) continue;
+
+			if (!deduped.has(userId)) {
+				deduped.set(userId, createdAt);
+				continue;
+			}
+
+			const previous = deduped.get(userId);
+			if (!previous && createdAt) {
+				deduped.set(userId, createdAt);
+				continue;
+			}
+
+			if (previous && createdAt && createdAt.getTime() > previous.getTime()) {
+				deduped.set(userId, createdAt);
+			}
+		}
+
+		return Array.from(deduped.entries()).map(([userId, createdAt]) => ({
+			userId,
+			createdAt,
+		}));
+	}
+
+	private serializeImageLikes(
+		likes: Array<{ userId: string; createdAt?: Date }>
+	): Array<{ user: mongoose.Types.ObjectId; createdAt: Date }> {
+		return likes
+			.filter((entry) => mongoose.Types.ObjectId.isValid(entry.userId))
+			.map((entry) => ({
+				user: new mongoose.Types.ObjectId(entry.userId),
+				createdAt: entry.createdAt ?? new Date(),
+			}));
+	}
 
 	getCurrentUser = async (req: Request, res: Response): Promise<void> => {
 		try {
@@ -71,13 +163,13 @@ export class UserController {
 
 			const likes = Array.isArray(currentUser.images)
 				? currentUser.images.reduce(
-						(sum, image) => sum + (Array.isArray(image.likes) ? image.likes.length : 0),
+						(sum, image) => sum + this.normalizeImageLikes(image.likes).length,
 						0
 				  )
 				: 0;
 
 			const [profileViews, connectionMatches, modelMatches] = await Promise.all([
-				SwipeModel.countDocuments({ swipedUser: currentUser._id }),
+				ProfileViewModel.countDocuments({ profileOwner: currentUser._id }),
 				ConnectionModel.countDocuments({
 					$or: [{ userA: currentUser._id }, { userB: currentUser._id }],
 				}),
@@ -111,7 +203,7 @@ export class UserController {
 			}
 
 			const currentUser = await UserModel.findOne(query).select(
-				"_id images notificationPreferences blockedUsers updatedAt"
+				"_id images notificationPreferences blockedUsers"
 			);
 			if (!currentUser) {
 				res.status(404).json({ success: false, message: "User not found" });
@@ -132,6 +224,7 @@ export class UserController {
 				notificationId: string;
 				fromUserId: string;
 				imageId: string;
+				createdAt?: Date;
 			}> = [];
 
 			(currentUser.images || []).forEach((image, index) => {
@@ -140,14 +233,17 @@ export class UserController {
 					image.public_id ||
 					image.url ||
 					`image-${index + 1}`;
-				(image.likes || []).forEach((likerId) => {
-					const liker = likerId.toString();
+
+				const likes = this.normalizeImageLikes(image.likes);
+				likes.forEach((entry) => {
+					const liker = entry.userId;
 					if (liker === currentUser._id.toString()) return;
 					if (blockedSet.has(liker)) return;
 					likeEntries.push({
 						notificationId: `${imageId}:${liker}`,
 						fromUserId: liker,
 						imageId,
+						createdAt: entry.createdAt,
 					});
 				});
 			});
@@ -207,9 +303,14 @@ export class UserController {
 						imageId: entry.imageId,
 						name: liker?.name || "PairUp user",
 						image: liker?.avatar || "",
-						createdAt: currentUser.updatedAt?.toISOString?.(),
+						createdAt: entry.createdAt?.toISOString?.(),
 						message: "liked your post",
 					};
+				})
+				.sort((left, right) => {
+					const leftMs = left.createdAt ? new Date(left.createdAt).getTime() : 0;
+					const rightMs = right.createdAt ? new Date(right.createdAt).getTime() : 0;
+					return rightMs - leftMs;
 				});
 
 			res.status(200).json({
@@ -281,6 +382,18 @@ export class UserController {
 				return;
 			}
 
+			const rawTrackView =
+				typeof req.query.trackView === "string" ? req.query.trackView.trim().toLowerCase() : "";
+			const shouldTrackView = !["false", "0", "no"].includes(rawTrackView);
+
+			if (shouldTrackView) {
+				await ProfileViewModel.create({
+					viewer: currentUser._id,
+					profileOwner: targetUser._id,
+					viewedAt: new Date(),
+				});
+			}
+
 			const images = Array.isArray(targetUser.images)
 				? targetUser.images
 						.map((image, index) => {
@@ -289,14 +402,16 @@ export class UserController {
 								image.public_id ||
 								image.url ||
 								`image-${index + 1}`;
-							const likes = Array.isArray(image.likes) ? image.likes : [];
+							const likes = this.normalizeImageLikes(image.likes);
 
 							return {
 								id: imageId,
 								url: image.url,
 								isThumbnail: Boolean(image.isThumbnail),
 								likesCount: likes.length,
-								likedByMe: likes.some((id) => id.equals(currentUser._id)),
+								likedByMe: likes.some(
+									(entry) => entry.userId === currentUser._id.toString()
+								),
 							};
 						})
 						.filter((image) => Boolean(image.url))
@@ -315,6 +430,13 @@ export class UserController {
 					: null;
 
 			const totalImageLikes = images.reduce((sum, image) => sum + (image.likesCount ?? 0), 0);
+			const [profileViews, connectionMatches, modelMatches] = await Promise.all([
+				ProfileViewModel.countDocuments({ profileOwner: targetUser._id }),
+				ConnectionModel.countDocuments({
+					$or: [{ userA: targetUser._id }, { userB: targetUser._id }],
+				}),
+				MatchModel.countDocuments({ users: { $in: [targetUser._id] } }),
+			]);
 
 			res.status(200).json({
 				success: true,
@@ -332,9 +454,9 @@ export class UserController {
 					isOwnProfile: false,
 					lastSeen: visibleLastSeen,
 					stats: {
-						views: 0,
+						views: profileViews,
 						likes: totalImageLikes,
-						matches: 0,
+						matches: Math.max(connectionMatches, modelMatches),
 					},
 				},
 			});
@@ -562,13 +684,22 @@ export class UserController {
 				return;
 			}
 
-			const likes = Array.isArray(targetImage.likes) ? targetImage.likes : [];
-			const alreadyLiked = likes.some((id) => id.equals(currentUser._id));
+			const likes = this.normalizeImageLikes(targetImage.likes);
+			const currentUserId = currentUser._id.toString();
+			const alreadyLiked = likes.some((entry) => entry.userId === currentUserId);
 
 			if (alreadyLiked) {
-				targetImage.likes = likes.filter((id) => !id.equals(currentUser._id));
+				targetImage.likes = this.serializeImageLikes(
+					likes.filter((entry) => entry.userId !== currentUserId)
+				);
 			} else {
-				targetImage.likes = [...likes, currentUser._id];
+				targetImage.likes = this.serializeImageLikes([
+					...likes,
+					{
+						userId: currentUserId,
+						createdAt: new Date(),
+					},
+				]);
 			}
 
 			await targetUser.save();
@@ -578,7 +709,7 @@ export class UserController {
 				message: alreadyLiked ? "Post unliked" : "Post liked",
 				data: {
 					liked: !alreadyLiked,
-					likesCount: targetImage.likes.length,
+					likesCount: this.normalizeImageLikes(targetImage.likes).length,
 					imageId: targetImage._id?.toString() || targetImage.public_id || rawImageId,
 					userId: targetUser._id.toString(),
 				},
@@ -1268,15 +1399,13 @@ export class UserController {
 
 	getAllUsers = async (req: Request, res: Response): Promise<void> => {
 		try {
-			const actorId = req.user?.id || req.user?.mongoId || (req.user as any)?._id;
-			if (!actorId) {
+			const query = this.resolveCurrentUserQuery(req);
+			if (!query) {
 				res.status(401).json({ success: false, message: "Unauthorized" });
 				return;
 			}
 
-			const currentUser = await UserModel.findOne({ $or: [{ uid: actorId }, { _id: actorId }] }).select(
-				"_id uid interestedIn"
-			);
+			const currentUser = await UserModel.findOne(query).select("_id uid interestedIn");
 			if (!currentUser) {
 				res.status(404).json({ success: false, message: "User not found" });
 				return;
@@ -1396,7 +1525,9 @@ export class UserController {
 							_id: user._id,
 							name: [user.firstname, user.lastname].filter(Boolean).join(" ").trim(),
 							age: user.age ?? null,
+							location: typeof user.location === "string" ? user.location : "",
 							bio: user.bio ?? "",
+							interests: Array.isArray(user.interests) ? user.interests : [],
 							images: normalizedImages,
 						},
 					];
@@ -1408,7 +1539,7 @@ export class UserController {
 				role: { $ne: "admin" },
 				...genderPreferenceFilter,
 			})
-				.select("_id firstname lastname age bio images profileImage profileImagePublicId")
+				.select("_id firstname lastname age location bio interests images profileImage profileImagePublicId")
 				.lean();
 
 			const previousUsers = includePrevious
@@ -1417,7 +1548,7 @@ export class UserController {
 					role: { $ne: "admin" },
 					...genderPreferenceFilter,
 				})
-						.select("_id firstname lastname age bio images profileImage profileImagePublicId")
+						.select("_id firstname lastname age location bio interests images profileImage profileImagePublicId")
 						.lean()
 				: [];
 
@@ -1426,7 +1557,7 @@ export class UserController {
 				role: { $ne: "admin" },
 				...genderPreferenceFilter,
 			})
-				.select("_id firstname lastname age bio images profileImage profileImagePublicId")
+				.select("_id firstname lastname age location bio interests images profileImage profileImagePublicId")
 				.limit(50)
 				.lean();
 
@@ -1531,6 +1662,8 @@ export class UserController {
 			}
 
 			selectedImage.isThumbnail = true;
+			user.profileImage = selectedImage.url;
+			user.profileImagePublicId = selectedImage.public_id || "";
 			await user.save();
 
 			const {
@@ -1543,7 +1676,7 @@ export class UserController {
 
 			res.status(200).json({
 				success: true,
-				message: "Thumbnail updated successfully",
+				message: "Profile photo updated successfully",
 				data: safeUser,
 			});
 		} catch (error) {

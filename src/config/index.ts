@@ -5,6 +5,10 @@ dotenv.config({ quiet: process.env.NODE_ENV === "test" });
 export const PORT: number = 
 process.env.PORT ? parseInt(process.env.PORT): 3000;
 
+export const HOST: string = process.env.HOST || "0.0.0.0";
+
+export const LAN_IP: string = process.env.LAN_IP || "192.168.18.155";
+
 export const MONGO_URI: string =
 process.env.MONGO_URI || 'mongodb+srv://ttrabin935_db_user:DW6AqoVctjtKXeND@cluster0.92eh3by.mongodb.net/test';
 

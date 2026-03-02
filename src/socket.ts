@@ -13,6 +13,7 @@ import {
   buildModerationReportReason,
   moderateMessageText,
 } from "./utils/message-moderation";
+import { LAN_IP } from "./config";
 
 type AuthedSocket = Socket & { user?: jwt.JwtPayload | string };
 
@@ -23,6 +24,7 @@ export function initSocket(httpServer: HTTPServer) {
     cors: {
       origin: [
         "http://10.0.2.2:3000",
+        `http://${LAN_IP}:3000`,
         "http://localhost:3000",
         "http://localhost:3001",
       ],
