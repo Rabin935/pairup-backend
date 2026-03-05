@@ -3,6 +3,10 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 
 let mongoServer: MongoMemoryServer;
 
+process.env.NODE_ENV = "test";
+process.env.EMAIL_USER = process.env.EMAIL_USER || "test@example.com";
+process.env.EMAIL_PASS = process.env.EMAIL_PASS || "test-password";
+
 /**
  * Start in-memory MongoDB before all tests
  * This runs once for the entire test suite

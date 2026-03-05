@@ -9,6 +9,8 @@ export const UserSchema = z.object({
   number: z.string().min(1, { error: "Phone number is required" }),
   authProvider: z.string().min(1, { error: "Auth provider is required" }),
   role: z.enum(["admin", "user"]).default("user"),
+  isBanned: z.boolean().default(false),
+  banReason: z.string().default(""),
   password: z.string().min(6, { error: "Password must be at least 6 char long" }),
   gender: z.enum(["male", "female", "other"]).optional(),
   interestedIn: z.enum(["male", "female"]).optional(),
@@ -25,10 +27,38 @@ export const UserSchema = z.object({
         url: z.string().min(1, { error: "Image URL is required" }),
         public_id: z.string().min(1, { error: "Cloudinary public_id is required" }),
         isThumbnail: z.boolean().default(false),
+        likes: z.array(z.string()).default([]),
       })
     )
     .default([]),
   isProfileComplete: z.boolean().default(false),
+  lastSeen: z.date().optional(),
+  onlineVisibility: z.boolean().default(true),
+  notificationPreferences: z
+    .object({
+      likes: z.boolean().default(true),
+      postLikes: z.boolean().default(true),
+      matches: z.boolean().default(true),
+      messages: z.boolean().default(true),
+    })
+    .default({
+      likes: true,
+      postLikes: true,
+      matches: true,
+      messages: true,
+    }),
+  privacy: z
+    .object({
+      showAge: z.boolean().default(true),
+      showLocation: z.boolean().default(true),
+      showOnlineStatus: z.boolean().default(true),
+    })
+    .default({
+      showAge: true,
+      showLocation: true,
+      showOnlineStatus: true,
+    }),
+  blockedUsers: z.array(z.string()).default([]),
   createdAt: z.date().default(() => new Date()),
   updatedAt: z.date().default(() => new Date()),
 });

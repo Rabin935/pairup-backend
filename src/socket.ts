@@ -6,8 +6,13 @@ import { socketAuth } from "./middleware/socket-auth";
 import { MessageModel } from "./models/message.model";
 import { ConversationModel } from "./models/conversation.model";
 import { ConnectionModel } from "./models/connection.model";
+import { ReportModel } from "./models/report.model";
 import { markOnline, markOffline } from "./services/presence.service";
 import { UserModel } from "./models/user.model";
+import {
+  buildModerationReportReason,
+  moderateMessageText,
+} from "./utils/message-moderation";
 
 type AuthedSocket = Socket & { user?: jwt.JwtPayload | string };
 
@@ -61,6 +66,52 @@ export function initSocket(httpServer: HTTPServer) {
       );
     }
 
+    socket.on("joinConversation", (payload: { conversationId?: string }) => {
+      const conversationId = payload?.conversationId;
+      if (!conversationId || !Types.ObjectId.isValid(conversationId)) return;
+      socket.join(`conversation:${conversationId}`);
+    });
+
+    socket.on("leaveConversation", (payload: { conversationId?: string }) => {
+      const conversationId = payload?.conversationId;
+      if (!conversationId || !Types.ObjectId.isValid(conversationId)) return;
+      socket.leave(`conversation:${conversationId}`);
+    });
+
+    socket.on(
+      "typing:start",
+      (payload: { conversationId?: string; receiverId?: string }) => {
+        const conversationId = payload?.conversationId;
+        const receiverId = payload?.receiverId;
+
+        if (!conversationId || !Types.ObjectId.isValid(conversationId)) return;
+        if (!receiverId || !Types.ObjectId.isValid(receiverId)) return;
+        if (receiverId === userRoom) return;
+
+        io.to(receiverId).emit("typing:start", {
+          conversationId,
+          userId: userRoom,
+        });
+      }
+    );
+
+    socket.on(
+      "typing:stop",
+      (payload: { conversationId?: string; receiverId?: string }) => {
+        const conversationId = payload?.conversationId;
+        const receiverId = payload?.receiverId;
+
+        if (!conversationId || !Types.ObjectId.isValid(conversationId)) return;
+        if (!receiverId || !Types.ObjectId.isValid(receiverId)) return;
+        if (receiverId === userRoom) return;
+
+        io.to(receiverId).emit("typing:stop", {
+          conversationId,
+          userId: userRoom,
+        });
+      }
+    );
+
     socket.on(
       "sendMessage",
       async (
@@ -69,8 +120,9 @@ export function initSocket(httpServer: HTTPServer) {
       ) => {
         const { senderId, receiverId, text, clientMessageId } = payload;
         const authUserId = userId.toString();
+        const normalizedText = typeof text === "string" ? text.trim() : "";
 
-        if (!senderId || !receiverId || !text) {
+        if (!senderId || !receiverId || !normalizedText) {
           callback?.({ success: false, message: "Missing required fields" });
           return;
         }
@@ -114,22 +166,44 @@ export function initSocket(httpServer: HTTPServer) {
             return;
           }
 
+          const moderationResult = moderateMessageText(normalizedText);
           const message = await MessageModel.create({
             conversationId: conversation._id,
             sender: new Types.ObjectId(senderId),
             receiver: new Types.ObjectId(receiverId),
-            text,
+            text: normalizedText,
+            flagged: moderationResult.flagged,
           });
 
-          conversation.lastMessage = text;
+          conversation.lastMessage = normalizedText;
           await conversation.save();
+
+          if (moderationResult.flagged && senderId.toString() !== receiverId.toString()) {
+            await ReportModel.create({
+              reporter: new Types.ObjectId(receiverId),
+              reportedUser: new Types.ObjectId(senderId),
+              reason: buildModerationReportReason(moderationResult.matchedWords),
+              status: "pending",
+            });
+
+            io.emit("admin:message-flagged", {
+              messageId: message._id.toString(),
+              senderId: senderId.toString(),
+              receiverId: receiverId.toString(),
+              matchedWords: moderationResult.matchedWords,
+              createdAt: message.createdAt,
+            });
+          }
 
           const messagePayload = {
             id: message._id.toString(),
             conversationId: conversation._id.toString(),
             senderId: senderId.toString(),
             receiverId: receiverId.toString(),
+            body: message.text,
             text: message.text,
+            imageUrl: message.imageUrl || "",
+            flagged: message.flagged,
             createdAt: message.createdAt,
             clientMessageId,
           };
@@ -144,10 +218,18 @@ export function initSocket(httpServer: HTTPServer) {
       }
     );
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", async () => {
       const wentOffline = markOffline(userRoom);
       if (wentOffline) {
-        broadcastPresence(userRoom, "offline").catch((err) =>
+        const lastSeen = new Date();
+
+        try {
+          await UserModel.findByIdAndUpdate(userRoom, { lastSeen });
+        } catch (error) {
+          console.error("Failed to update lastSeen", error);
+        }
+
+        broadcastPresence(userRoom, "offline", lastSeen.toISOString()).catch((err) =>
           console.error("Failed to broadcast presence offline", err)
         );
       }
@@ -165,8 +247,15 @@ export function getIO(): SocketIOServer {
   return ioInstance;
 }
 
-async function broadcastPresence(userId: string, status: "online" | "offline") {
+async function broadcastPresence(
+  userId: string,
+  status: "online" | "offline",
+  lastSeen?: string
+) {
   const io = getIO();
+  const user = await UserModel.findById(userId).select("onlineVisibility").lean();
+  const visibleStatus =
+    status === "online" && user?.onlineVisibility === false ? "offline" : status;
   const connections = await ConnectionModel.find({
     $or: [{ userA: userId }, { userB: userId }],
   }).select("userA userB");
@@ -175,9 +264,11 @@ async function broadcastPresence(userId: string, status: "online" | "offline") {
     conn.userA.toString() === userId ? conn.userB.toString() : conn.userA.toString()
   );
 
+  const payload = { userId, status: visibleStatus, ...(lastSeen ? { lastSeen } : {}) };
+
   peerIds.forEach((peerId) => {
-    io.to(peerId).emit("presence:update", { userId, status });
+    io.to(peerId).emit("presence:update", payload);
   });
 
-  io.to(userId).emit("presence:update", { userId, status });
+  io.to(userId).emit("presence:update", payload);
 }

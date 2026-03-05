@@ -7,6 +7,7 @@ export interface IInvitation extends Document {
   toUser: mongoose.Types.ObjectId;
   status: InvitationStatus;
   expiresAt?: Date;
+  seenAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,6 +35,11 @@ const InvitationSchema: Schema = new Schema(
     expiresAt: {
       type: Date,
       required: false,
+    },
+    seenAt: {
+      type: Date,
+      default: null,
+      index: true,
     },
   },
   {
