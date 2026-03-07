@@ -1,6 +1,6 @@
 import express from "express";
 import { authorizedMiddleware } from "../../middleware/authorized.middleware";
-import { adminOnly } from "../../middleware/admin/admin.middleware";
+import { isAdmin } from "../../middleware/admin/admin.middleware";
 import { upload } from "../../middleware/multer";
 
 import {
@@ -29,33 +29,36 @@ const router = express.Router();
 router.post("/login", adminLogin);
 
 // Admin routes (protected)
-router.use(authorizedMiddleware, adminOnly);
+router.get("/stats", authorizedMiddleware, isAdmin, getAdminStats);
+router.get("/metrics", authorizedMiddleware, isAdmin, getPlatformMetrics);
+router.get("/analytics", authorizedMiddleware, isAdmin, getGrowthAnalytics);
 
-router.get("/dashboard", getAdminStats);
-router.get("/platform-metrics", getPlatformMetrics);
-router.get("/analytics", getGrowthAnalytics);
-router.get("/messages", getAdminMessages);
-router.patch("/messages/:id/dismiss-flag", dismissMessageFlag);
-router.delete("/messages/:id", deleteAdminMessage);
+router.get("/messages", authorizedMiddleware, isAdmin, getAdminMessages);
+router.patch("/messages/:id/dismiss-flag", authorizedMiddleware, isAdmin, dismissMessageFlag);
+router.delete("/messages/:id", authorizedMiddleware, isAdmin, deleteAdminMessage);
 
-router.get("/users", getUsers);
-router.get("/users/:id", getUserById);
-router.patch("/users/:id/ban", banUser);
-router.patch("/users/:id/unban", unbanUser);
+router.get("/reports", authorizedMiddleware, isAdmin, getReports);
+router.patch("/reports/:id/review", authorizedMiddleware, isAdmin, reviewReport);
+router.patch("/reports/:id/resolve", authorizedMiddleware, isAdmin, resolveReport);
+
+router.get("/users", authorizedMiddleware, isAdmin, getUsers);
+router.get("/users/:id", authorizedMiddleware, isAdmin, getUserById);
 router.post(
   "/users",
+  authorizedMiddleware,
+  isAdmin,
   upload.single("image"),
   createUser
 );
+router.patch("/users/:id/ban", authorizedMiddleware, isAdmin, banUser);
+router.patch("/users/:id/unban", authorizedMiddleware, isAdmin, unbanUser);
 router.put(
   "/users/:id",
+  authorizedMiddleware,
+  isAdmin,
   upload.single("image"),
   updateUser
 );
-router.delete("/users/:id", deleteUser);
-
-router.get("/reports", getReports);
-router.patch("/reports/:id/review", reviewReport);
-router.patch("/reports/:id/resolve", resolveReport);
+router.delete("/users/:id", authorizedMiddleware, isAdmin, deleteUser);
 
 export default router;

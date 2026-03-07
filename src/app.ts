@@ -26,7 +26,7 @@ export function createApp(): Application {
         "http://localhost:3000", // Flutter web
         "*", // Allow all (dev only)
       ],
-      methods: ["GET", "POST", "PUT", "DELETE"],
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
     })
   );
@@ -42,10 +42,10 @@ export function createApp(): Application {
   app.use("/api/swipes", swipeRoutes);
   app.use("/api/messages", messageRoutes);
   app.use("/api/invites", inviteRoutes);
-  app.use("/api/connections", connectionRoutes);
-  app.use("/api/conversations", conversationRoutes);
   app.use("/api/likes", likeRoutes);
   app.use("/api/matches", matchRoutes);
+  app.use("/api/connections", connectionRoutes);
+  app.use("/api/conversations", conversationRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/admin", adminRoutes);
 
